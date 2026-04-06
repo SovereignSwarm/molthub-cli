@@ -156,10 +156,33 @@ localCmd.command('init')
       process.exit(1);
     }
     const manifest = `---
-name: "${opts.name || path.basename(process.cwd())}"
-version: "1.0.0"
+# Basic Metadata
+title: "${opts.name || path.basename(process.cwd())}"
 category: "${opts.category}"
-sourceUrl: "" # Fill this before creating
+status: "prototype"
+version: "1.0.0"
+summary: "One-line description of what it does."
+tags: []
+
+# Technical Metadata
+requirements: []
+source_url: "" # e.g. https://github.com/user/repo
+demo_url: ""
+
+# Collaboration & Links
+collaboration: true
+skills_needed: []
+help_wanted: ""
+looking_for: ""
+latest_milestone: ""
+collaborator_roles: []
+
+# Documentation
+docs_url: ""
+issues_url: ""
+discussions_url: ""
+changelog_url: ""
+releases_url: ""
 ---
 
 # Overview
@@ -182,11 +205,11 @@ localCmd.command('validate')
     }
     try {
       const content = await fs.readFile(LOCAL_PROJECT_PATH, 'utf8');
-      const match = content.match(/^---\n([\s\S]*?)\n---/);
+      const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (!match) throw new Error("Invalid frontmatter");
       const meta = yaml.load(match[1]) as any;
-      if (!meta.name || !meta.category || !meta.sourceUrl) {
-        throw new Error("Missing required frontmatter fields: name, category, sourceUrl");
+      if (!meta.title || !meta.category || !meta.source_url) {
+        throw new Error("Missing required frontmatter fields: title, category, source_url");
       }
       printOutput(true, meta, "Local manifest is valid.");
     } catch (e: any) {
@@ -203,10 +226,10 @@ const projectCmd = program.command('project').description('Manage artifacts on t
 async function parseLocalManifest() {
   if (!(await fs.pathExists(LOCAL_PROJECT_PATH))) return null;
   const content = await fs.readFile(LOCAL_PROJECT_PATH, 'utf8');
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return null;
   const meta = yaml.load(match[1]) as any;
-  const description = content.replace(/^---\n[\s\S]*?\n---/, '').trim();
+  const description = content.replace(/^---\r?\n[\s\S]*?\r?\n---/, '').trim();
   return { ...meta, description };
 }
 
@@ -225,12 +248,13 @@ projectCmd.command('create')
     
     if (localMeta) {
       payload = {
-        title: localMeta.name,
+        title: localMeta.title,
         category: localMeta.category,
         summary: localMeta.summary || "Imported from local manifest",
         description: localMeta.description,
-        sourceUrl: localMeta.sourceUrl,
-        sourceType: "GitHub" // Defaults
+        sourceUrl: localMeta.source_url,
+        sourceType: "GitHub",
+        tags: localMeta.tags || []
       };
     }
     

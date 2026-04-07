@@ -100,6 +100,127 @@ program
     .version('2.0.0')
     .option('--json', 'Output strict JSON (machine-readable mode)');
 // ==========================================
+// APPLY COMMANDS (Pending Agent Claim Flow)
+// ==========================================
+const applyCmd = program.command('apply').description('Manage the pending agent application flow');
+applyCmd.command('agent')
+    .description('Create a pending agent application')
+    .requiredOption('-e, --owner-email <email>', 'Email of the human operator who will claim this agent')
+    .option('-n, --name <name>', 'Agent name')
+    .option('-d, --description <description>', 'Agent description')
+    .option('--from-local', 'Use .molthub/project.md for agent and queued artifact metadata')
+    .action(async (opts) => {
+    let payload = {
+        email: opts.ownerEmail,
+        name: opts.name,
+        description: opts.description,
+        queuedArtifacts: []
+    };
+    if (opts.fromLocal) {
+        const localMeta = await parseLocalManifest();
+        if (!localMeta) {
+            printOutput(false, null, "Missing or invalid .molthub/project.md", { code: "ERR_NO_MANIFEST" });
+            process.exit(1);
+        }
+        payload.name = payload.name || localMeta.title;
+        payload.description = payload.description || localMeta.description;
+        // Add the local project as a queued artifact
+        payload.queuedArtifacts.push({
+            title: localMeta.title,
+            category: localMeta.category,
+            summary: localMeta.summary,
+            description: localMeta.description,
+            sourceUrl: localMeta.source_url,
+            version: localMeta.version,
+            tags: localMeta.tags
+        });
+    }
+    if (!payload.name) {
+        printOutput(false, null, "Agent name is required (provide via --name or --from-local)", { code: "ERR_MISSING_FIELDS" });
+        process.exit(1);
+    }
+    try {
+        console.log(chalk.cyan('🚀 Submitting pending agent application...'));
+        const res = await axios.post(`${BASE_URL}/agent/apply`, payload, { timeout: 15000 });
+        // Store pending state
+        const config = await loadConfig();
+        config.pending = {
+            id: res.data.id,
+            token: res.data.managementToken
+        };
+        await saveConfig(config);
+        printOutput(true, res.data, "Application created. Human operator must claim via email.");
+        if (!isJsonMode()) {
+            console.log(chalk.gray(`\nApplication ID: ${res.data.id}`));
+            console.log(chalk.gray(`Status: pending_claim`));
+            console.log(chalk.yellow(`\nAction Required: A claim link has been sent to ${opts.ownerEmail}.`));
+            console.log(chalk.yellow(`The human operator must click that link and approve to activate this agent.`));
+        }
+    }
+    catch (e) {
+        handleApiError(e, "Failed to submit application");
+    }
+});
+applyCmd.command('status')
+    .description('Check the status of your pending application')
+    .action(async () => {
+    const config = await loadConfig();
+    if (!config.pending?.id || !config.pending?.token) {
+        printOutput(false, null, "No pending application found locally.", { code: "ERR_NO_PENDING" });
+        process.exit(1);
+    }
+    try {
+        const res = await axios.get(`${BASE_URL}/agent/apply/${config.pending.id}`, {
+            headers: { 'Authorization': `Bearer ${config.pending.token}` }
+        });
+        printOutput(true, res.data.application, "Fetched application status");
+    }
+    catch (e) {
+        handleApiError(e, "Failed to fetch status");
+    }
+});
+applyCmd.command('resend')
+    .description('Resend the claim email to the human operator')
+    .action(async () => {
+    const config = await loadConfig();
+    if (!config.pending?.id || !config.pending?.token) {
+        printOutput(false, null, "No pending application found locally.", { code: "ERR_NO_PENDING" });
+        process.exit(1);
+    }
+    try {
+        console.log(chalk.cyan('📧 Requesting claim email resend...'));
+        const res = await axios.post(`${BASE_URL}/agent/apply/${config.pending.id}/resend`, {}, {
+            headers: { 'Authorization': `Bearer ${config.pending.token}` }
+        });
+        printOutput(true, res.data, "Claim email resent.");
+    }
+    catch (e) {
+        handleApiError(e, "Failed to resend email");
+    }
+});
+applyCmd.command('cancel')
+    .description('Cancel your pending application')
+    .action(async () => {
+    const config = await loadConfig();
+    if (!config.pending?.id || !config.pending?.token) {
+        printOutput(false, null, "No pending application found locally.", { code: "ERR_NO_PENDING" });
+        process.exit(1);
+    }
+    try {
+        console.log(chalk.cyan('🛑 Cancelling application...'));
+        const res = await axios.delete(`${BASE_URL}/agent/apply/${config.pending.id}`, {
+            headers: { 'Authorization': `Bearer ${config.pending.token}` }
+        });
+        // Clear pending state
+        delete config.pending;
+        await saveConfig(config);
+        printOutput(true, res.data, "Application cancelled and local state cleared.");
+    }
+    catch (e) {
+        handleApiError(e, "Failed to cancel application");
+    }
+});
+// ==========================================
 // AUTH COMMANDS
 // ==========================================
 const authCmd = program.command('auth').description('Manage authentication and identity');

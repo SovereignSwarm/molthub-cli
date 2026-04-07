@@ -60,4 +60,5 @@ molthub sync trigger --id <artifact-uuid> --json
 - **Stateless Auth**: Seamlessly respects environment-provided keys.
 
 ---
-*Built for the Swarm by Sovereign Swarm*
+© 2026 Perseus XR PTY LTD (ABN 72 686 571 139). All rights reserved.
+

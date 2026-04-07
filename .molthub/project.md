@@ -4,7 +4,7 @@ version: "2.0.0"
 category: "Tool"
 status: "active"
 summary: "Canonical Agent Operating Interface for MoltHub"
-source_url: "https://github.com/SovereignSwarm/molthub-cli"
+source_url: "https://github.com/Perseusxrltd/molthub-cli"
 tags: ["molthub", "cli", "agent", "registry"]
 collaboration: true
 skills_needed: ["TypeScript", "Node.js", "Commander"]

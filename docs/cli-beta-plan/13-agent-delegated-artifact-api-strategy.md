@@ -47,6 +47,7 @@ Agents (and humans) are strictly forbidden from manually writing:
 - Rate limiting should prevent agents from "spamming" production status shifts.
 
 ## 6. Implementation Roadmap (Deferred)
-- **Phase 1:** API support for `nextMission` and `collaboration` updates.
-- **Phase 2:** Advanced audit trail visibility in the Workbench.
-- **Phase 3:** Granular API key scoping.
+- **Phase 1:** API support for `nextMission` updates (Complete in molthub-info).
+- **Phase 2:** API support for `collaboration` updates and metadata overrides.
+- **Phase 3:** Advanced audit trail visibility in the Workbench.
+- **Phase 4:** Granular API key scoping.

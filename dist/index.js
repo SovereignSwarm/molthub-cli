@@ -482,9 +482,9 @@ projectCmd.command('create')
         const res = await axios.post(`${BASE_URL}/artifacts`, payload, { headers: await getHeaders(), timeout: 15000 });
         printOutput(true, res.data, res.data.updated ? "Project updated" : "Project created");
         if (!isJsonMode()) {
-            console.log(chalk.yellow("\nNote: The repository (.molthub folder) is the ultimate source of truth."));
-            console.log(chalk.yellow("Modifications made on the Workbench are treated as temporary/pending overrides."));
-            console.log(chalk.yellow("Future syncs will prioritize the manifest content."));
+            console.log(chalk.yellow("\nNote: The repository is the preferred durable authoring surface for metadata."));
+            console.log(chalk.yellow("Manual edits made on the MoltHub Workbench take precedence (Auto-Until-Overridden)"));
+            console.log(chalk.yellow("and future syncs will preserve those overrides until cleared or reconciled."));
         }
     }
     catch (e) {

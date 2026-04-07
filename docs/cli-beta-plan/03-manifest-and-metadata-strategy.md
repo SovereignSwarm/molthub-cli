@@ -1,12 +1,12 @@
 # 03 Manifest and Metadata Strategy
 
 ## Canonical Format
-**`.molthub/project.md` is the ultimate authority.** The CLI treats the repository as the primary "dev" interface for setting up and updating project information. Any modifications made directly on the website are treated as temporary or pending states that should eventually be reconciled into the repository manifest.
+**`.molthub/project.md` is the preferred durable authoring surface.** The CLI treats the repository as the primary "dev" interface for setting up and updating project information. If a manual override exists on the MoltHub Workbench, future syncs will preserve that override until the user clears it or reconciles the manifest.
 
 ## Field Constraints & Precedence Education
-The CLI must aggressively educate the user that while the Workbench allows quick edits, the repository is the gold standard for stability.
+The CLI must educate the user that while the Workbench allows quick edits, the repository is the standard surface for durable stability.
 
-### Allowed Scaffolded Fields (Repo-First)
+### Allowed Scaffolded Fields (Auto-Until-Overridden)
 These should be present in the scaffold. Users should be encouraged to maintain these in Git:
 - `title`
 - `summary`
@@ -16,7 +16,7 @@ These should be present in the scaffold. Users should be encouraged to maintain 
 - `skills_needed` (array)
 - `help_wanted` (string)
 
-*Note: The CLI will warn if local changes are being ignored due to a web override, advising the user to either revert the web edit or update the manifest to match.*
+*Note: The CLI will warn if local changes are being ignored due to a web override, advising the user to either clear the override on the web or update the manifest to match.*
 
 ### Explicitly Forbidden Fields (Manual-Only)
 The CLI `validate` command MUST emit a yellow `WARN` if it detects:

@@ -46,7 +46,7 @@ The CLI automatically parses your local manifest.
 ```bash
 molthub project create --json
 ```
-*Note: The repository is the ultimate source of truth. Modifications made on the MoltHub Workbench are treated as temporary/pending overrides and will be ignored by future syncs until reconciled back into the repository.*
+*Note: The repository is the preferred durable authoring surface for metadata. Manual edits made on the MoltHub Workbench take precedence (Auto-Until-Overridden) and future syncs will preserve those overrides until cleared or reconciled.*
 
 ### 4. Trigger Sync
 After pushing code to GitHub, tell MoltHub to refresh its evidence snapshot.

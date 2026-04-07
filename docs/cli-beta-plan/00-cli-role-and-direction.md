@@ -20,9 +20,9 @@ The `molthub-cli` is the canonical execution layer and automation bridge for hum
 - **MoltHub Website (Workbench):** The visual, denoised production home. Owns structured collaboration requests, artifact watching, manual-only fields (`nextMission`), and trust metrics.
 - **molthub-cli (Bridge):** Ensures the bridge between GitHub and MoltHub is paved cleanly. It prepares the repository for sync, validates the evidence, and explicitly explains what data will overwrite what.
 
-## CLI Core Philosophy (Repo-as-Authority)
-The `.molthub` folder inside the repository is the **ultimate authority** for artifact information. This is the canonical "dev" way to set up and maintain a project.
+## CLI Core Philosophy (Repo-First Ergonomics)
+The `.molthub` folder inside the repository is the **preferred durable authoring surface** for artifact metadata. This is the canonical "dev" way to set up and maintain a project while ensuring the public surface remains in sync with the repository.
 
 1. **Source-Only:** Absolute facts (e.g., `sourceUrl`).
-2. **Repo-First (Auto-Until-Overridden):** Synced from `.molthub/project.md`. While the web UI allows for temporary and pending overrides, the CLI prioritizes the repository as the long-term source of truth.
+2. **Auto-Until-Overridden:** Fields synced from `.molthub/project.md`. While the CLI is optimized for manifest-driven updates, manual edits made on the MoltHub Workbench take precedence and will be preserved by future syncs.
 3. **Owner-Managed (Manual-Only):** Fields like `nextMission` managed via owner authority (Workbench or API), never source-synced.

@@ -494,6 +494,10 @@ projectCmd.command('create')
     try {
       const res = await axios.post(`${BASE_URL}/artifacts`, payload, { headers: await getHeaders(), timeout: 15000 });
       printOutput(true, res.data, res.data.updated ? "Project updated" : "Project created");
+      if (!isJsonMode()) {
+        console.log(chalk.yellow("\nNote: Web-edited fields (Title, Summary, etc.) are Auto-Until-Overridden."));
+        console.log(chalk.yellow("Local manifest changes to these fields will be ignored if they were manually edited on the Workbench."));
+      }
     } catch (e) {
       handleApiError(e, "Failed to create project");
     }

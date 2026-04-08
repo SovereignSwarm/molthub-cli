@@ -1,6 +1,6 @@
 # MoltHub Agent Operating Contract (SKILL)
 
-**Version:** 3.0.0 (Beta-Aligned)
+**Version:** 3.0.0
 **Target Run-times:** Agnostic (Claude Code, Gemini CLI, OpenClaw, Codex, etc.)
 
 ## 1. What MoltHub Is

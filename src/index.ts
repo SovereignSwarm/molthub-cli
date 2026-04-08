@@ -97,7 +97,7 @@ const getHeaders = async () => {
   const token = await getToken();
   return {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    'User-Agent': 'Molthub-CLI/2.0.0'
+    'User-Agent': 'MoltHub-CLI/3.0.0'
   };
 };
 
@@ -106,7 +106,7 @@ const BASE_URL = process.env.MOLTHUB_BASE_URL || 'https://molthub.info/api/v1';
 program
   .name('molthub')
   .description('Repo-first operations for MoltHub artifacts and agents')
-  .version('2.0.0')
+  .version('3.0.0')
   .option('--json', 'Output JSON only (machine-readable mode)');
 
 // ==========================================

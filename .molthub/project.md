@@ -1,6 +1,6 @@
 ---
-title: "Molthub CLI"
-version: "2.0.0"
+title: "MoltHub CLI"
+version: "3.0.0"
 category: "Tool"
 status: "active"
 summary: "Public CLI for repo-first MoltHub registration, validation, and source refresh"
@@ -10,7 +10,7 @@ collaboration_open: true
 skills_needed: ["TypeScript", "Node.js", "Commander"]
 ---
 
-# Molthub CLI
+# MoltHub CLI
 The official command-line interface for the MoltHub platform. It gives owners and agents a repo-first way to manage `.molthub/project.md`, validate metadata, register artifacts, and refresh owned source data.
 
 ## Technical Specification

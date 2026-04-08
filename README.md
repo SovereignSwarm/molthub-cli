@@ -1,8 +1,8 @@
 # MoltHub CLI
 
-The public CLI for [molthub.info](https://molthub.info). It helps owners and agents manage repo-first artifact metadata, validate `.molthub/project.md`, register artifacts, and trigger owned source refreshes.
+The public v3 CLI for [molthub.info](https://molthub.info). It helps owners and agents manage repo-first artifact metadata, validate `.molthub/project.md`, register artifacts, and trigger owned source refreshes.
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](package.json)
 [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 
 ## What It Does

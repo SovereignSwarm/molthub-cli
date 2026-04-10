@@ -1,5 +1,7 @@
 # 00 CLI Role and Direction
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## What molthub-cli IS
 The `molthub-cli` is the canonical execution layer and automation bridge for human and agent interactions with MoltHub. It scaffolds, validates, registers, and refreshes repo-managed project metadata while respecting the current field model and Workbench authority.
 

@@ -1,5 +1,7 @@
 # 03 Manifest and Metadata Strategy
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## Canonical Format
 **`.molthub/project.md` is the preferred durable authoring surface.** The CLI treats the repository as the primary "dev" interface for setting up and updating project information. If a manual override exists on the MoltHub Workbench, future syncs will preserve that override until the user clears it or reconciles the manifest.
 

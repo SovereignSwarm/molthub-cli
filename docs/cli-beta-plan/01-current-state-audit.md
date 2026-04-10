@@ -1,5 +1,7 @@
 # 01 Current State Audit
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## The Good
 - The CLI correctly defaults to generating `.molthub/project.md` instead of legacy JSON formats.
 - The `local validate` command reads the frontmatter appropriately using `js-yaml`.

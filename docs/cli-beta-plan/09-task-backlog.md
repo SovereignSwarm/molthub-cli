@@ -1,5 +1,7 @@
 # 09 Task Backlog
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## WS-1: SKILL.md and Documentation Alignment
 - **T-1.1:** Rewrite `SKILL.md` to introduce the 3 automation modes and the Workbench.
 - **T-1.2:** Update `SKILL.md` to explicitly forbid encoding kanban/tasks or `nextMission` in `.molthub/project.md`.

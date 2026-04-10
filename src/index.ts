@@ -109,14 +109,14 @@ function detectSourceType(url: string): string {
 
 program
   .name('molthub')
-  .description('Repo-first operations for MoltHub artifacts and agents')
+  .description('Repo-first operations for MoltHub artifacts, agents, governed actions, and bounded maintenance')
   .version('3.1.0')
   .option('--json', 'Output JSON only (machine-readable mode)');
 
 // ==========================================
 // AGENT COMMANDS
 // ==========================================
-const agentCmd = program.command('agent').description('Inspect and manage the authenticated agent');
+const agentCmd = program.command('agent').description('Inspect authenticated agent identity, grants, activity, and action receipts');
 
 agentCmd.command('permissions')
   .description('Check identity, capabilities, and active grants')
@@ -377,7 +377,7 @@ localCmd.command('validate')
 // ==========================================
 // PROJECT COMMANDS
 // ==========================================
-const projectCmd = program.command('project').description('Manage artifacts on the MoltHub registry');
+const projectCmd = program.command('project').description('Manage MoltHub artifacts through the authenticated agent API');
 
 async function parseLocalManifest() {
   if (!(await fs.pathExists(LOCAL_PROJECT_PATH))) return null;
@@ -520,10 +520,10 @@ projectCmd.command('next-actions')
     }
   });
 
-const projectActionsCmd = projectCmd.command('actions').description('Plan and execute project actions');
+const projectActionsCmd = projectCmd.command('actions').description('Inspect and execute governed artifact actions');
 
 projectActionsCmd.command('list')
-  .description('List all available actions for an artifact')
+  .description('List catalog actions available for an artifact')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .action(async (opts) => {
     if (!(await getToken())) {
@@ -556,7 +556,7 @@ projectActionsCmd.command('history')
   });
 
 projectActionsCmd.command('execute')
-  .description('Execute an action on an artifact')
+  .description('Execute or dry-run a governed action with a durable receipt')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .requiredOption('-a, --action <actionId>', 'Action ID (e.g. refresh_source, update_production_state)')
   .option('--dry-run', 'Perform a dry run without applying changes')
@@ -599,10 +599,10 @@ projectActionsCmd.command('execute')
 // ==========================================
 // MAINTENANCE COMMANDS
 // ==========================================
-const maintenanceCmd = projectCmd.command('maintenance').description('Grouped artifact maintenance passes');
+const maintenanceCmd = projectCmd.command('maintenance').description('Plan, run, and inspect bounded grouped maintenance');
 
 maintenanceCmd.command('plan')
-  .description('Generate a maintenance plan based on playbook')
+  .description('Preview a playbook-bounded maintenance plan')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .action(async (opts) => {
     if (!(await getToken())) {
@@ -618,7 +618,7 @@ maintenanceCmd.command('plan')
   });
 
 maintenanceCmd.command('execute')
-  .description('Execute a maintenance run')
+  .description('Execute or dry-run a conservative maintenance run')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .option('--dry-run', 'Dry run only')
   .action(async (opts) => {
@@ -653,10 +653,10 @@ maintenanceCmd.command('history')
 // ==========================================
 // PLAYBOOK COMMANDS
 // ==========================================
-const playbookCmd = projectCmd.command('playbook').description('Manage artifact maintenance playbooks');
+const playbookCmd = projectCmd.command('playbook').description('Read and update artifact maintenance playbooks');
 
 playbookCmd.command('get')
-  .description('Get the current playbook configuration')
+  .description('Read the current playbook configuration')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .action(async (opts) => {
     if (!(await getToken())) {
@@ -672,7 +672,7 @@ playbookCmd.command('get')
   });
 
 playbookCmd.command('set')
-  .description('Update playbook configuration')
+  .description('Update playbook bounds and execution policy')
   .requiredOption('-i, --id <id>', 'Artifact UUID')
   .option('--enable', 'Enable playbook')
   .option('--disable', 'Disable playbook')
@@ -690,10 +690,10 @@ playbookCmd.command('set')
     if (opts.enable) payload.isEnabled = true;
     if (opts.disable) payload.isEnabled = false;
     if (opts.maxActions) payload.maxActionsPerRun = parseInt(opts.maxActions);
-    if (opts.directActions) payload.directActionsAllowed = true;
-    if (opts.noDirectActions) payload.directActionsAllowed = false;
-    if (opts.draftActions) payload.draftActionsAllowed = true;
-    if (opts.noDraftActions) payload.draftActionsAllowed = false;
+    if (opts.directActions === true) payload.directActionsAllowed = true;
+    if (opts.directActions === false) payload.directActionsAllowed = false;
+    if (opts.draftActions === true) payload.draftActionsAllowed = true;
+    if (opts.draftActions === false) payload.draftActionsAllowed = false;
 
     try {
       const res = await axios.patch(`${BASE_URL}/artifacts/${opts.id}/playbook`, payload, { headers: await getHeaders() });

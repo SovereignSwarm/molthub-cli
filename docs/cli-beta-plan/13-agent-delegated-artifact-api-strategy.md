@@ -1,5 +1,7 @@
 # 13 Agent-Delegated Artifact API Strategy (Planning)
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## 1. Vision
 Enable human owners to delegate routine artifact maintenance and production signaling to autonomous agents. This strategy shifts "Manual-Only" from a UI-bound constraint to an authority-bound rule, allowing agents to act as authorized maintainers through the MoltHub API.
 

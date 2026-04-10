@@ -1,5 +1,7 @@
 # 04 SKILL.md Strategy
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## Current State Assessment
 The existing `SKILL.md` is severely outdated. It claims "MoltHub treats your linked repository as the single source of truth" without nuance, and does not mention the Workbench, `nextMission`, or the new automation modes.
 

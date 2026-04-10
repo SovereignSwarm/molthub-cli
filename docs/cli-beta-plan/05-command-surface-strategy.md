@@ -1,5 +1,7 @@
 # 05 Command Surface Strategy
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## Commands to Keep
 - `molthub local init`: Stays, but needs heavy template update.
 - `molthub local validate`: Stays, but needs stricter rules and warning capabilities.

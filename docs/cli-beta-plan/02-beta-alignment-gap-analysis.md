@@ -1,5 +1,7 @@
 # 02 Beta Alignment Gap Analysis
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## 1. Automation Mode Ignorance (High Priority)
 **Gap:** The CLI blindly creates and syncs manifests without warning users that manual web edits will cause syncs to skip certain fields (Auto-Until-Overridden).
 **Impact:** Users will edit `.molthub/project.md`, trigger a sync, and get frustrated when the web UI doesn't update, not realizing they overrode the field on the web.

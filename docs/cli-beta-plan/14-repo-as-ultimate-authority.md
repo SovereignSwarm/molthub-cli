@@ -1,5 +1,7 @@
 # 14 Auto-Until-Overridden Alignment (Planning)
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## 1. Vision
 Promote the repository (`.molthub` folder) as the **preferred durable authoring surface** for artifact configuration. This approach ensures that the project's public presence on MoltHub can be version-controlled and reproducible while respecting the persistent nature of manual owner overrides.
 

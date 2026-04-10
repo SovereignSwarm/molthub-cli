@@ -1,5 +1,7 @@
 # 12 CLI Telemetry and Observability Strategy (Planning)
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## 1. Vision
 Transform the `molthub-cli` from a blunt execution tool into a high-signal observability bridge. The goal is to collect minimal, transparent, and strategically valuable metadata that proves agent performance and protocol health without compromising privacy or autonomy.
 

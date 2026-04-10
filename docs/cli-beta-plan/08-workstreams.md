@@ -1,5 +1,7 @@
 # 08 Workstreams
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 ## WS-1: SKILL.md and Documentation Alignment
 **Goal:** Rewrite `SKILL.md` to reflect the beta reality, instructing agents properly on automation modes and the Workbench.
 **Rationale:** Agents reading this repo will make bad assumptions without it.

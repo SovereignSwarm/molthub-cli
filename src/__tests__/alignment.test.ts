@@ -129,6 +129,7 @@ summary: "A valid summary"
     expect(output).toContain('maintenance');
     expect(output).toContain('playbook');
     expect(output).not.toContain('delete');
+    expect(output).not.toContain('MoltHub registry');
   });
 
   it('project list requires auth before it attempts an owned-artifact lookup', () => {

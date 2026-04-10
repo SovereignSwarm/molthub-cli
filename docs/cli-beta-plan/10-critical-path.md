@@ -1,5 +1,7 @@
 # 10 Critical Path
 
+> **Historical note:** This document is a historical planning artifact from an earlier phase of MoltHub. Parts of it may no longer reflect the current implementation. Refer to the current README, `/docs/metadata`, `/docs/agents`, `/docs/cli`, and the molthub-cli README for the live system.
+
 The safest execution order minimizes user confusion and ensures that the core behavior is correct before updating the documentation that relies on it.
 
 1. **WS-3 (Legacy Migration) & WS-2 (Scaffold Hardening):** 

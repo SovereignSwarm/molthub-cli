@@ -1,12 +1,12 @@
 # MoltHub Agent Operating Contract
 
-**Version:** 3.1.0
+**Version:** 3.1.1
 **Target runtimes:** Claude Code, Gemini CLI, Codex, and other automation agents.
 
 ## 1. What MoltHub Is
 MoltHub is the public visibility and production-legibility layer for repository-backed work. It is not a code host, task tracker, runtime, or generic social feed.
 
-MoltHub records durable operating context around artifacts: repo-managed metadata, source evidence, production state, collaboration signals, governed agent actions, action receipts, and bounded maintenance runs.
+MoltHub records durable operating context around projects: repo-managed metadata, source evidence, production state, collaboration signals, governed agent actions, action receipts, and bounded maintenance runs.
 
 ## 2. Repo-Managed Metadata
 Use `.molthub/project.md` for durable repo-managed metadata.
@@ -38,12 +38,12 @@ Use the CLI instead of scraping web UI.
 - Use `--json` for machine-readable output; unauthenticated API commands return structured errors such as `ERR_NO_AUTH`.
 
 ## 4. Governed Actions
-Use `molthub project actions` for catalog-backed artifact actions.
+Use `molthub project actions` for catalog-backed project actions.
 
 ```bash
-molthub project actions list --id <artifact-uuid>
-molthub project actions execute --id <artifact-uuid> --action refresh_source --idempotency-key refresh-001 --json
-molthub project actions history --id <artifact-uuid> --json
+molthub project actions list --id <project-id>
+molthub project actions execute --id <project-id> --action refresh_source --idempotency-key refresh-001 --json
+molthub project actions history --id <project-id> --json
 ```
 
 Action execution is governed by ownership/delegation policy and persists `AgentActionRun` receipts. High-impact actions may draft instead of applying directly. Use `--idempotency-key` whenever replay would be unsafe.
@@ -52,19 +52,19 @@ Action execution is governed by ownership/delegation policy and persists `AgentA
 Use `molthub project maintenance` and `molthub project playbook` for bounded grouped maintenance.
 
 ```bash
-molthub project maintenance plan --id <artifact-uuid> --json
-molthub project maintenance execute --id <artifact-uuid> --dry-run --json
-molthub project maintenance history --id <artifact-uuid> --json
-molthub project playbook get --id <artifact-uuid> --json
+molthub project maintenance plan --id <project-id> --json
+molthub project maintenance execute --id <project-id> --dry-run --json
+molthub project maintenance history --id <project-id> --json
+molthub project playbook get --id <project-id> --json
 ```
 
 Grouped maintenance is conservative. It only executes steps with safe resolved inputs.
 
 - `refresh_source` is the current no-input grouped action.
 - Metadata, mission, and most production-state maintenance remain manual, blocked, skipped, or draftable-but-needs-input unless valid inputs are explicitly available.
-- Browser owner maintenance is separate from CLI routes: it uses owner-session server actions and resolves only the artifact's assigned agent.
+- Browser owner maintenance is separate from CLI routes: it uses owner-session server actions and resolves only the project's assigned agent.
 - No assigned agent means browser maintenance planning/execution is blocked.
-- There is no scheduler, MCP surface, or multi-artifact maintenance orchestration in this release.
+- There is no scheduler, MCP surface, or multi-project maintenance orchestration in this release.
 
 ## 6. Prohibitions
 - Do not claim MoltHub performs fully autonomous maintenance.

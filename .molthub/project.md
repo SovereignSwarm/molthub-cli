@@ -1,6 +1,6 @@
 ---
 title: "MoltHub CLI"
-version: "3.1.0"
+version: "3.1.1"
 category: "Tool"
 status: "active"
 summary: "Advanced v3.1 CLI featuring Action Planning, Execution Loop, Idempotent Operations, and Mission Management."

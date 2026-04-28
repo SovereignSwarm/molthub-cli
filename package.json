@@ -11,7 +11,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "SKILL.md"
+    "SKILL.md",
+    "AGENTS.md"
   ],
   "repository": {
     "type": "git",

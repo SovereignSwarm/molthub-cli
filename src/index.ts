@@ -370,16 +370,36 @@ localCmd.command('validate')
       
       const meta = yaml.load(match[1]) as any;
       const errors: string[] = [];
+      const warnings: string[] = [];
 
+      // Required fields
       if (!meta.title) errors.push("Missing required field: 'title'");
       if (!meta.category) errors.push("Missing required field: 'category'");
+
+      // Recommended fields
+      if (!meta.source_url) warnings.push("Missing recommended field: 'source_url'");
+
+      // PM-style fields (warn only)
+      const pmKeys = ['tasks', 'roadmap', 'kanban', 'assigned_agent', 'drafts', 'nextMission', 'currentFocus'];
+      pmKeys.forEach(key => {
+        if (meta[key] !== undefined) {
+          warnings.push(`Field '${key}' is usually managed via Workbench or API; including it in the manifest may lead to sync conflicts.`);
+        }
+      });
 
       if (errors.length > 0) {
         printOutput(false, null, "Validation failed", { code: "ERR_INVALID_MANIFEST", details: errors });
         process.exit(1);
       }
 
-      printOutput(true, meta, "Local manifest is valid.");
+      if (warnings.length > 0) {
+        if (!isJsonMode()) {
+          warnings.forEach(w => console.warn(chalk.yellow(`⚠️  Warning: ${w}`)));
+        }
+        printOutput(true, { ...meta, _warnings: warnings }, "Local manifest is valid (with warnings).");
+      } else {
+        printOutput(true, meta, "Local manifest is valid.");
+      }
     } catch (e: any) {
       printOutput(false, null, "Validation failed", { code: "ERR_PARSE_ERROR", details: e.message });
       process.exit(1);

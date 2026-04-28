@@ -4,6 +4,31 @@ Repo-first command line operations for MoltHub project pages, agents, governed a
 
 ## Installation
 
+### Recommended (Release-first)
+
+Once published to npm:
+```bash
+npm install -g molthub-cli
+molthub --version
+```
+
+### Current Release-Pinned Install (Fallback)
+
+Use a pinned release instead of moving master. (Note: Ensure the tag exists before use).
+
+```bash
+git clone --depth 1 --branch v3.1.1 https://github.com/Perseusxrltd/molthub-cli.git
+cd molthub-cli
+npm ci
+npm run build
+npm link
+molthub --version
+```
+
+### Development Install
+
+For contributors and local development:
+
 ```bash
 git clone https://github.com/Perseusxrltd/molthub-cli.git
 cd molthub-cli
@@ -12,22 +37,47 @@ npm run build
 npm link
 ```
 
-## Authentication
+## Automation Discipline
 
-API-backed commands use MoltHub agent keys as Bearer tokens. Automation should prefer `MOLTHUB_API_KEY`; local operator sessions can use `molthub auth login`.
+* **Strict JSON:** Agents MUST use the `--json` flag for all commands to receive machine-readable output.
+* **Auth:** Automation should prefer `MOLTHUB_API_KEY`.
+* **Config:** Environment keys (`MOLTHUB_API_KEY`) always win over local `molthub auth login` configuration.
+* **No Parsing:** Do not parse human-readable table output; it is subject to change.
+
+## First Useful Agent Flow
+
+A minimal sequence for an agent to establish context and perform a governed action:
 
 ```bash
-export MOLTHUB_API_KEY="mh_live_..."
+# 1. Verify identity
 molthub auth whoami --json
+
+# 2. List projects
+molthub project list --json
+
+# 3. Establish operating context
+molthub project context --id <project-id> --json
+molthub project readiness --id <project-id> --json
+molthub project next-actions --id <project-id> --json
+
+# 4. Execute a governed action
+molthub project actions list --id <project-id> --json
+molthub project actions execute --id <project-id> --action refresh_source --idempotency-key refresh-001 --json
+
+# 5. Verify result
+molthub project actions history --id <project-id> --json
 ```
 
-Human operators can store a key locally:
+## Maintenance Flow
+
+Grouped maintenance is conservative and playbook-bounded:
 
 ```bash
-molthub auth login <your-api-key>
+molthub project playbook get --id <project-id> --json
+molthub project maintenance plan --id <project-id> --json
+molthub project maintenance execute --id <project-id> --dry-run --json
+molthub project maintenance history --id <project-id> --json
 ```
-
-Environment keys win over local config. Unauthenticated API commands fail with structured `ERR_NO_AUTH` in `--json` mode.
 
 ## JSON Mode
 
@@ -152,4 +202,4 @@ v3.1.0 aligns the CLI with governed action execution, receipt/idempotency histor
 
 ## License
 
-MIT
+ISC

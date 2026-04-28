@@ -55,41 +55,37 @@ describe('MoltHub CLI Beta Alignment', () => {
     expect(content).toContain('"legacy-skill"');
   });
 
-  it('local validate warns on nextMission', () => {
+  it('local validate warns on missing source_url and PM keys', () => {
     fs.ensureDirSync(path.join(testDir, '.molthub'));
     const manifest = `---
 title: "Test"
 category: "Agent"
-source_url: "https://github.com/test"
-nextMission: "Testing"
----
-# Body`;
-    fs.writeFileSync(path.join(testDir, '.molthub', 'project.md'), manifest);
-
-    // In v3.1.0 we simplified validate to mostly check required fields
-    // and PM keys. nextMission warning might be removed or changed.
-    // Let's just check it still validates basic required fields.
-    const output = execSync(`${CLI_PATH} local validate`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString();
-    expect(output).toContain('✔ Local manifest is valid.');
-  });
-
-  it('local validate warns on PM keys', () => {
-    fs.ensureDirSync(path.join(testDir, '.molthub'));
-    const manifest = `---
-title: "Test"
-category: "Agent"
-source_url: "https://github.com/test"
 tasks: ["task1"]
 ---
 # Body`;
     fs.writeFileSync(path.join(testDir, '.molthub', 'project.md'), manifest);
 
-    // Re-check PM keys logic in index.ts - I might have removed it during rewrite
-    // I will keep the test but maybe index.ts needs it back if it's important.
-    // Actually, I removed the PM keys warning in my rewrite.
-    // I'll update the test to expect success if I don't want to re-add it now.
-    const output = execSync(`${CLI_PATH} local validate`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString();
-    expect(output).toContain('✔ Local manifest is valid.');
+    const output = execSync(`${CLI_PATH} --json local validate`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString().trim();
+    const parsed = JSON.parse(output);
+    
+    expect(parsed.success).toBe(true);
+    expect(parsed.data._warnings).toContain("Missing recommended field: 'source_url'");
+    expect(parsed.data._warnings.some((w: string) => w.includes("'tasks'"))).toBe(true);
+    });
+
+  it('AGENTS.md exists and contains essential automation rules', () => {
+    const agentsPath = path.join(process.cwd(), 'AGENTS.md');
+    expect(fs.existsSync(agentsPath)).toBe(true);
+    const content = fs.readFileSync(agentsPath, 'utf8');
+    expect(content).toContain('--json');
+    expect(content).toContain('MOLTHUB_API_KEY');
+    expect(content).toContain('idempotency');
+  });
+
+  it('SKILL.md is updated to 3.1.1', () => {
+    const skillPath = path.join(process.cwd(), 'SKILL.md');
+    const content = fs.readFileSync(skillPath, 'utf8');
+    expect(content).toContain('3.1.1');
   });
 
   it('local validate returns error for missing project.md', () => {

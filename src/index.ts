@@ -1033,4 +1033,332 @@ program.command('commands')
     printOutput(true, { manifest }, "Command manifest");
   });
 
+
+
+// ==========================================
+// RESEARCH COMMANDS
+// ==========================================
+const researchCmd = program.command('research').description('Research radar operations');
+
+researchCmd.command('search')
+  .description('Search for papers')
+  .option('--q <query>', 'Search query')
+  .option('--domain <domain>', 'Domain tag')
+  .option('--problem <problem>', 'Problem tag')
+  .option('--method <method>', 'Method tag')
+  .option('--readiness <readiness>', 'Readiness tag')
+  .option('--limit <limit>', 'Max results')
+  .action(async (opts) => {
+    try {
+      const p = new URLSearchParams();
+      if (opts.q) p.set('q', opts.q);
+      if (opts.domain) p.set('domain', opts.domain);
+      if (opts.problem) p.set('problem', opts.problem);
+      if (opts.method) p.set('method', opts.method);
+      if (opts.readiness) p.set('readiness', opts.readiness);
+      if (opts.limit) p.set('limit', opts.limit);
+      const res = await axios.get(`${BASE_URL}/research/search?${p.toString()}`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Research search results");
+    } catch (e) {
+      handleApiError(e, "Failed to search research");
+    }
+  });
+
+researchCmd.command('import')
+  .description('Import research paper metadata')
+  .requiredOption('--title <title>', 'Paper title')
+  .option('--abstract <abstract>', 'Abstract')
+  .option('--doi <doi>', 'DOI')
+  .option('--arxiv <id>', 'arXiv ID')
+  .option('--source-url <url>', 'Source URL')
+  .action(async (opts) => {
+    try {
+      const payload = {
+        title: opts.title,
+        abstract: opts.abstract,
+        doi: opts.doi,
+        arxivId: opts.arxiv,
+        sourceUrl: opts.sourceUrl
+      };
+      const res = await axios.post(`${BASE_URL}/research/import`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Paper imported");
+    } catch (e) {
+      handleApiError(e, "Failed to import paper");
+    }
+  });
+
+researchCmd.command('paper')
+  .description('Get paper details')
+  .requiredOption('--id <id>', 'Paper ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/research/papers/${opts.id}`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Paper details");
+    } catch (e) {
+      handleApiError(e, "Failed to get paper");
+    }
+  });
+
+researchCmd.command('claims')
+  .description('Get paper claims')
+  .requiredOption('--paper <id>', 'Paper ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/research/papers/${opts.paper}/claims`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Paper claims");
+    } catch (e) {
+      handleApiError(e, "Failed to get claims");
+    }
+  });
+
+const researchClaimCmd = researchCmd.command('claim').description('Claim operations');
+
+researchClaimCmd.command('create')
+  .description('Create a claim for a paper')
+  .requiredOption('--paper <id>', 'Paper ID')
+  .requiredOption('--text <text>', 'Claim text')
+  .option('--type <type>', 'Claim type')
+  .option('--confidence <level>', 'Confidence level')
+  .option('--problem-tags <tags>', 'Comma-separated problem tags')
+  .option('--method-tags <tags>', 'Comma-separated method tags')
+  .option('--production-tags <tags>', 'Comma-separated production tags')
+  .option('--risk-tags <tags>', 'Comma-separated risk tags')
+  .action(async (opts) => {
+    try {
+      const payload: any = { claimText: opts.text };
+      if (opts.type) payload.claimType = opts.type;
+      if (opts.confidence) payload.confidence = opts.confidence;
+      if (opts.problemTags) payload.problemTags = opts.problemTags.split(',').map((s:string) => s.trim());
+      if (opts.methodTags) payload.methodTags = opts.methodTags.split(',').map((s:string) => s.trim());
+      if (opts.productionTags) payload.productionTags = opts.productionTags.split(',').map((s:string) => s.trim());
+      if (opts.riskTags) payload.riskTags = opts.riskTags.split(',').map((s:string) => s.trim());
+
+      const res = await axios.post(`${BASE_URL}/research/papers/${opts.paper}/claims`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Claim created");
+    } catch (e) {
+      handleApiError(e, "Failed to create claim");
+    }
+  });
+
+// ==========================================
+// PROJECT RESEARCH COMMANDS
+// ==========================================
+
+const projectResearchCmd = projectCmd.command('research').description('Project research commands');
+
+projectResearchCmd.command('scan')
+  .description('Scan for research matches')
+  .requiredOption('--id <id>', 'Project ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/research-scan`, {}, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Research scan completed");
+    } catch (e) {
+      handleApiError(e, "Failed to scan research");
+    }
+  });
+
+projectResearchCmd.command('matches')
+  .description('List research matches')
+  .requiredOption('--id <id>', 'Project ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/research-matches`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Project research matches");
+    } catch (e) {
+      handleApiError(e, "Failed to get matches");
+    }
+  });
+
+projectResearchCmd.command('missionize')
+  .description('Generate mission from a research match')
+  .requiredOption('--id <id>', 'Project ID')
+  .requiredOption('--match <id>', 'Match ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/research-matches/${opts.match}/create-mission`, {}, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Mission generation drafted");
+    } catch (e) {
+      handleApiError(e, "Failed to create mission from match");
+    }
+  });
+
+// ==========================================
+// PROBLEM COMMANDS
+// ==========================================
+const problemCmd = program.command('problem').description('Manage research problems');
+
+problemCmd.command('list')
+  .description('List open problems')
+  .option('--tag <tag>', 'Filter by tag')
+  .option('--status <status>', 'Filter by status')
+  .option('--limit <limit>', 'Max entries')
+  .action(async (opts) => {
+    try {
+      const p = new URLSearchParams();
+      if (opts.tag) p.set('tag', opts.tag);
+      if (opts.status) p.set('status', opts.status);
+      if (opts.limit) p.set('limit', opts.limit);
+      const res = await axios.get(`${BASE_URL}/research/problems?${p.toString()}`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Research problems");
+    } catch (e) {
+      handleApiError(e, "Failed to list problems");
+    }
+  });
+
+problemCmd.command('create')
+  .description('Create a research problem')
+  .requiredOption('--title <title>', 'Title')
+  .requiredOption('--summary <summary>', 'Summary')
+  .option('--problem-tags <tags>', 'Problem tags (comma-separated)')
+  .option('--domain-tags <tags>', 'Domain tags (comma-separated)')
+  .option('--method-tags <tags>', 'Method tags (comma-separated)')
+  .action(async (opts) => {
+    try {
+      const payload: any = { title: opts.title, summary: opts.summary };
+      if (opts.problemTags) payload.problemTags = opts.problemTags.split(',').map((s:string) => s.trim());
+      if (opts.domainTags) payload.domainTags = opts.domainTags.split(',').map((s:string) => s.trim());
+      if (opts.methodTags) payload.methodTags = opts.methodTags.split(',').map((s:string) => s.trim());
+
+      const res = await axios.post(`${BASE_URL}/research/problems`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Problem created");
+    } catch (e) {
+      handleApiError(e, "Failed to create problem");
+    }
+  });
+
+// ==========================================
+// AGENT ROOM & HANDOFF COMMANDS
+// ==========================================
+
+const agentRoomCmd = agentCmd.command('room').description('Manage collaboration rooms');
+
+agentRoomCmd.command('list')
+  .description('List rooms')
+  .option('--artifact <id>', 'Artifact ID filter')
+  .option('--mission <id>', 'Mission ID filter')
+  .option('--type <type>', 'Room type filter')
+  .action(async (opts) => {
+    try {
+      const p = new URLSearchParams();
+      if (opts.artifact) p.set('artifact', opts.artifact);
+      if (opts.mission) p.set('mission', opts.mission);
+      if (opts.type) p.set('type', opts.type);
+      const res = await axios.get(`${BASE_URL}/agent/rooms?${p.toString()}`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Collaboration rooms");
+    } catch (e) {
+      handleApiError(e, "Failed to list rooms");
+    }
+  });
+
+agentRoomCmd.command('create')
+  .description('Create room')
+  .requiredOption('--title <title>', 'Room title')
+  .requiredOption('--type <type>', 'Room type')
+  .option('--artifact <id>', 'Associated artifact ID')
+  .option('--mission <id>', 'Associated mission ID')
+  .option('--research-problem <id>', 'Associated problem ID')
+  .action(async (opts) => {
+    try {
+      const payload: any = { title: opts.title, roomType: opts.type };
+      if (opts.artifact) payload.artifactId = opts.artifact;
+      if (opts.mission) payload.missionId = opts.mission;
+      if (opts.researchProblem) payload.researchProblemId = opts.researchProblem;
+      const res = await axios.post(`${BASE_URL}/agent/rooms`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Room created");
+    } catch (e) {
+      handleApiError(e, "Failed to create room");
+    }
+  });
+
+agentRoomCmd.command('messages')
+  .description('List room messages')
+  .requiredOption('--room <id>', 'Room ID')
+  .action(async (opts) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/agent/rooms/${opts.room}/messages`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Room messages");
+    } catch (e) {
+      handleApiError(e, "Failed to get messages");
+    }
+  });
+
+agentRoomCmd.command('post')
+  .description('Post room message')
+  .requiredOption('--room <id>', 'Room ID')
+  .requiredOption('--type <type>', 'Message type')
+  .requiredOption('--body <body>', 'Message body')
+  .option('--payload <json>', 'Optional JSON payload')
+  .action(async (opts) => {
+    try {
+      const payloadStr = opts.payload ? JSON.parse(opts.payload) : undefined;
+      const payloadObj = { messageType: opts.type, body: opts.body, payload: payloadStr };
+      const res = await axios.post(`${BASE_URL}/agent/rooms/${opts.room}/messages`, payloadObj, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Message posted");
+    } catch (e) {
+      if (e instanceof SyntaxError) return printOutput(false, null, "Invalid JSON payload", { code: "ERR_JSON_PARSE" });
+      handleApiError(e, "Failed to post message");
+    }
+  });
+
+const agentHandoffCmd = agentCmd.command('handoff').description('Manage handoffs');
+
+agentHandoffCmd.command('create')
+  .description('Create handoff packet')
+  .requiredOption('--to <id>', 'Agent slug or ID to handoff to')
+  .option('--artifact <id>', 'Artifact ID')
+  .option('--mission <id>', 'Mission ID')
+  .option('--room <id>', 'Room ID')
+  .option('--state <state>', 'Current state summary')
+  .option('--questions <json>', 'Open questions array')
+  .option('--evidence <json>', 'Evidence array')
+  .option('--next-actions <json>', 'Next recommended actions array')
+  .option('--risks <json>', 'Risks array')
+  .option('--requires-human-approval', 'Flag to require human approval')
+  .action(async (opts) => {
+    try {
+      const payload: any = { toAgentId: opts.to };
+      if (opts.artifact) payload.artifactId = opts.artifact;
+      if (opts.mission) payload.missionId = opts.mission;
+      if (opts.room) payload.roomId = opts.room;
+      if (opts.state) payload.currentState = opts.state;
+      if (opts.questions) payload.openQuestions = JSON.parse(opts.questions);
+      if (opts.evidence) payload.evidence = JSON.parse(opts.evidence);
+      if (opts.nextActions) payload.nextRecommendedActions = JSON.parse(opts.nextActions);
+      if (opts.risks) payload.risks = JSON.parse(opts.risks);
+      if (opts.requiresHumanApproval) payload.requiresHumanApproval = true;
+
+      const res = await axios.post(`${BASE_URL}/agent/handoffs`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Handoff created");
+    } catch (e) {
+      if (e instanceof SyntaxError) return printOutput(false, null, "Invalid JSON payload option", { code: "ERR_JSON_PARSE" });
+      handleApiError(e, "Failed to create handoff");
+    }
+  });
+
+agentHandoffCmd.command('inbox')
+  .description('List incoming handoffs')
+  .action(async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/agent/handoffs/inbox`, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Handoff inbox");
+    } catch (e) {
+      handleApiError(e, "Failed to load handoffs");
+    }
+  });
+
+agentHandoffCmd.command('update')
+  .description('Update handoff status')
+  .requiredOption('--id <id>', 'Handoff ID')
+  .requiredOption('--status <status>', 'New status')
+  .action(async (opts) => {
+    try {
+      const res = await axios.patch(`${BASE_URL}/agent/handoffs/${opts.id}`, { status: opts.status }, { headers: await getHeaders() });
+      printOutput(true, res.data.data, "Handoff updated");
+    } catch (e) {
+      handleApiError(e, "Failed to update handoff");
+    }
+  });
+
 program.parse(process.argv);
+

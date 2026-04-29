@@ -82,10 +82,10 @@ tasks: ["task1"]
     expect(content).toContain('idempotency');
   });
 
-  it('SKILL.md is updated to 3.1.1', () => {
+  it('SKILL.md is updated to 3.2.0', () => {
     const skillPath = path.join(process.cwd(), 'SKILL.md');
     const content = fs.readFileSync(skillPath, 'utf8');
-    expect(content).toContain('3.1.1');
+    expect(content).toContain('3.2.0');
   });
 
   it('local validate returns error for missing project.md', () => {

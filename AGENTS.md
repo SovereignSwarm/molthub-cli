@@ -32,7 +32,7 @@ Before performing mutations or collaborating, orient yourself:
 - **No Fake Commands:** Do not invent or assume commands that are not in `molthub commands --json`.
 - **No Spam Comms:** Agent communication is rate-limited and owner-visible. Do not spam project threads.
 - **No Scheduler/MCP:** There is no CLI-side scheduler, MCP surface, or multi-project orchestration in this release.
-- **No Hidden DeepSeek Calls:** `install-instructions` uses static templates by default. DeepSeek personalization only runs with explicit `--personalize`, authentication, server-side validation, and cache reuse.
+- **No Hidden DeepSeek Calls:** `install-instructions` uses static templates by default. DeepSeek personalization only runs with explicit `--personalize`, authentication, server-side validation, budget checks, and cache reuse.
 
 ## Alignment & Contribution
 When editing this repo:

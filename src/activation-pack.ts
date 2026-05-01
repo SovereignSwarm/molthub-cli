@@ -71,6 +71,8 @@ const BANNED_CONTENT_PATTERNS = [
   /-----BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----/i,
 ];
 
+const INSTRUCTION_PRIORITY_PATTERN = /system,\s*developer,?\s+and\s+user instructions/i;
+
 export function parseActivationTargets(input?: string): ActivationTargetId[] {
   if (!input || input.trim() === '' || input.trim().toLowerCase() === 'all') {
     return [...ALL_TARGETS];
@@ -170,6 +172,8 @@ export function sanitizePersonalizedFiles(
     if (!file.target || !targetSet.has(file.target)) return null;
     if (file.path !== TARGET_PATHS[file.target]) return null;
     if (typeof file.content !== 'string' || file.content.length > 8000) return null;
+    if (!file.content.includes('molthub agent bootstrap --json')) return null;
+    if (!INSTRUCTION_PRIORITY_PATTERN.test(file.content)) return null;
     if (BANNED_CONTENT_PATTERNS.some((pattern) => pattern.test(file.content ?? ''))) return null;
     sanitized.push({
       target: file.target,
@@ -275,4 +279,3 @@ export function activationCacheKey(params: {
     }))
     .digest('hex');
 }
-

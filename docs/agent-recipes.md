@@ -22,7 +22,7 @@ molthub agent install-instructions --targets all --json
 molthub agent install-instructions --write --targets all --json
 ```
 
-Static preview/write makes zero MoltHub or DeepSeek calls. Optional personalization is explicit and cached:
+Static preview/write makes zero MoltHub or DeepSeek calls. Optional personalization is explicit, authenticated, server-brokered, budgeted, and cached:
 
 ```bash
 molthub agent install-instructions --personalize --targets agents,claude --json

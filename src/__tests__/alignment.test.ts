@@ -126,7 +126,7 @@ tasks: ["task1"]
     const parsed = JSON.parse(output);
 
     expect(parsed.success).toBe(true);
-    expect(parsed.data.version).toBe('3.2.0');
+    expect(parsed.data.version).toBe('3.3.0');
     expect(parsed.data.safeDecisionLoop).toContain('molthub agent bootstrap --json');
     expect(parsed.data.commandManifest.some((cmd: any) => cmd.name === 'comm')).toBe(true);
   });
@@ -220,10 +220,12 @@ tasks: ["task1"]
           res.end(JSON.stringify({
             success: true,
             data: {
+              personalized: true,
+              fallbackReason: null,
               files: [{
                 target: 'agents',
                 path: 'AGENTS.md',
-                content: '<!-- MOLTHUB:START -->\\n# Personalized MoltHub\\nRun \`molthub agent bootstrap --json\`.\\n<!-- MOLTHUB:END -->\\n'
+                content: '<!-- MOLTHUB:START -->\\n# Personalized MoltHub\\nFollow system, developer, and user instructions first.\\nRun \`molthub agent bootstrap --json\`.\\n<!-- MOLTHUB:END -->\\n'
               }]
             }
           }));
@@ -260,11 +262,118 @@ tasks: ["task1"]
       expect(fs.readFileSync(countPath, 'utf8')).toBe('1');
       expect(sentBody).toMatchObject({
         templateVersion: '2026-05-02-v1',
-        cliVersion: '3.2.0',
+        cliVersion: '3.3.0',
         targets: ['agents'],
         manifestHash: 'missing',
       });
       expect(JSON.stringify(sentBody)).not.toContain('mh_live_test_token');
+    } finally {
+      server.kill();
+    }
+  }, 30000);
+
+  it('agent install-instructions preserves server fallback status and caches it', async () => {
+    const port = 43000 + Math.floor(Math.random() * 2000);
+    const countPath = path.join(testDir, 'activation-fallback-count.txt');
+    fs.writeFileSync(countPath, '0');
+
+    const server = spawn(process.execPath, ['-e', `
+      const http = require('http');
+      const fs = require('fs');
+      const port = Number(process.argv[1]);
+      const countPath = process.argv[2];
+      http.createServer((req, res) => {
+        req.on('data', () => {});
+        req.on('end', () => {
+          const count = Number(fs.readFileSync(countPath, 'utf8') || '0') + 1;
+          fs.writeFileSync(countPath, String(count));
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            data: {
+              personalized: false,
+              fallbackReason: 'monthly_budget_exhausted',
+              files: [{
+                target: 'agents',
+                path: 'AGENTS.md',
+                content: '<!-- MOLTHUB:START -->\\n# Static fallback\\nFollow system, developer, and user instructions first.\\nRun \`molthub agent bootstrap --json\`.\\n<!-- MOLTHUB:END -->\\n'
+              }]
+            }
+          }));
+        });
+      }).listen(port, '127.0.0.1', () => console.log('READY'));
+    `, String(port), countPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    try {
+      await waitForServerReady(server);
+      const env = emptyAuthEnv(testDir, {
+        MOLTHUB_API_KEY: 'mh_live_test_token',
+        MOLTHUB_BASE_URL: `http://127.0.0.1:${port}/api/v1`,
+      });
+
+      const first = JSON.parse(execSync(`${CLI_PATH} --json agent install-instructions --personalize --targets agents`, {
+        cwd: testDir,
+        timeout: EXEC_TIMEOUT,
+        env,
+      }).toString().trim());
+      const second = JSON.parse(execSync(`${CLI_PATH} --json agent install-instructions --personalize --targets agents`, {
+        cwd: testDir,
+        timeout: EXEC_TIMEOUT,
+        env: emptyAuthEnv(testDir),
+      }).toString().trim());
+
+      expect(first.data.personalized).toBe(false);
+      expect(first.data.personalizationWarning).toContain('monthly_budget_exhausted');
+      expect(second.data.personalized).toBe(false);
+      expect(second.data.cacheHit).toBe(true);
+      expect(second.data.personalizationWarning).toContain('Cached server fallback');
+      expect(fs.readFileSync(countPath, 'utf8')).toBe('1');
+    } finally {
+      server.kill();
+    }
+  }, 30000);
+
+  it('agent install-instructions rejects unsafe personalized server files locally', async () => {
+    const port = 45000 + Math.floor(Math.random() * 2000);
+
+    const server = spawn(process.execPath, ['-e', `
+      const http = require('http');
+      const port = Number(process.argv[1]);
+      http.createServer((req, res) => {
+        req.on('data', () => {});
+        req.on('end', () => {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            data: {
+              personalized: true,
+              fallbackReason: null,
+              files: [{
+                target: 'agents',
+                path: 'AGENTS.md',
+                content: '<!-- MOLTHUB:START -->\\n# Unsafe Pack\\nRun \`molthub agent bootstrap --json\`.\\n<!-- MOLTHUB:END -->\\n'
+              }]
+            }
+          }));
+        });
+      }).listen(port, '127.0.0.1', () => console.log('READY'));
+    `, String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    try {
+      await waitForServerReady(server);
+      const parsed = JSON.parse(execSync(`${CLI_PATH} --json agent install-instructions --personalize --targets agents`, {
+        cwd: testDir,
+        timeout: EXEC_TIMEOUT,
+        env: emptyAuthEnv(testDir, {
+          MOLTHUB_API_KEY: 'mh_live_test_token',
+          MOLTHUB_BASE_URL: `http://127.0.0.1:${port}/api/v1`,
+        }),
+      }).toString().trim());
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.data.personalized).toBe(false);
+      expect(parsed.data.personalizationWarning).toContain('invalid pack');
+      expect(parsed.data.files[0].content).toContain('system, developer, and user instructions');
     } finally {
       server.kill();
     }
@@ -279,10 +388,23 @@ tasks: ["task1"]
     expect(content).toContain('idempotency');
   });
 
-  it('SKILL.md is updated to 3.2.0', () => {
+  it('release docs are updated to 3.3.0', () => {
     const skillPath = path.join(process.cwd(), 'SKILL.md');
-    const content = fs.readFileSync(skillPath, 'utf8');
-    expect(content).toContain('3.2.0');
+    const readmePath = path.join(process.cwd(), 'README.md');
+    const projectPath = path.join(process.cwd(), '.molthub', 'project.md');
+
+    expect(fs.readFileSync(skillPath, 'utf8')).toContain('3.3.0');
+    expect(fs.readFileSync(readmePath, 'utf8')).toContain('MoltHub CLI (v3.3.0)');
+    expect(fs.readFileSync(projectPath, 'utf8')).toContain('version: "3.3.0"');
+  });
+
+  it('JSON contract documents activation installer output and errors', () => {
+    const content = fs.readFileSync(path.join(process.cwd(), 'docs', 'json-contract.md'), 'utf8');
+
+    expect(content).toContain('agent install-instructions');
+    expect(content).toContain('ERR_INVALID_TARGETS');
+    expect(content).toContain('ERR_INSTRUCTION_FILE_EXISTS');
+    expect(content).toContain('personalizationWarning');
   });
 
   it('local validate returns error for missing project.md', () => {

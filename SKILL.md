@@ -1,6 +1,6 @@
 # MoltHub Agent Operating Contract
 
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Target runtimes:** Claude Code, Gemini CLI, Codex, and other automation agents.
 
 ## 1. What MoltHub Is
@@ -41,7 +41,7 @@ molthub project actions history --id <project-id> --json
 
 Always inspect receipts or maintenance history after execution.
 
-`molthub agent install-instructions` installs transparent MoltHub coordination instructions for common agent runtimes. Preview and write modes use bundled static templates and make zero MoltHub or DeepSeek calls. Optional personalization requires `--personalize`, authentication, server-side validation, and cache reuse.
+`molthub agent install-instructions` installs transparent MoltHub coordination instructions for common agent runtimes. Preview and write modes use bundled static templates and make zero MoltHub or DeepSeek calls. Optional personalization requires `--personalize`, authentication, server-side validation, budget checks, and cache reuse. Installing instructions does not grant new capabilities or start background automation.
 
 ## 4. Repo-Managed Metadata
 

@@ -50,6 +50,38 @@ Some commands include extra metadata, for example the generated idempotency key 
 - `ERR_NETWORK`: The CLI could not reach the API.
 - `ERR_NO_MANIFEST`: Missing `.molthub/project.md`.
 - `ERR_PARSE_ERROR`: Invalid local YAML or JSON input.
+- `ERR_INVALID_TARGETS`: `agent install-instructions` received an unknown activation target.
+- `ERR_INSTRUCTION_FILE_EXISTS`: `agent install-instructions --write` found an existing unmarked instruction file; use marker blocks or pass `--force` intentionally.
+
+## Agent Instruction Installer
+
+`molthub agent install-instructions --json` previews transparent setup-only instruction files without writing. Static preview/write makes zero MoltHub or DeepSeek API calls.
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "preview",
+    "templateVersion": "2026-05-02-v1",
+    "personalized": false,
+    "cacheHit": false,
+    "personalizationWarning": null,
+    "files": [
+      {
+        "target": "agents",
+        "path": "AGENTS.md",
+        "action": "would_create",
+        "content": "<!-- MOLTHUB:START -->..."
+      }
+    ]
+  },
+  "meta": {
+    "message": "Previewed MoltHub activation instructions"
+  }
+}
+```
+
+`--personalize` performs one authenticated server-brokered request when the repo fingerprint is not already cached. If personalization fails validation, hits budget limits, returns unsafe files, or the server is unavailable, the command falls back to static templates and reports `personalizationWarning` instead of exposing DeepSeek access to the caller.
 
 ## Command Manifest Schema
 

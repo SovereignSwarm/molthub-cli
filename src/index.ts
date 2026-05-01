@@ -296,8 +296,11 @@ agentCmd.command('install-instructions')
       const cachedFiles = cachedPack ? sanitizePersonalizedFiles(targets, cachedPack.files) : null;
       if (cachedFiles) {
         files = cachedFiles;
-        personalized = true;
+        personalized = cachedPack.personalized === true;
         cacheHit = true;
+        if (!personalized && cachedPack.fallbackReason) {
+          personalizationWarning = `Cached server fallback: ${cachedPack.fallbackReason}. Used static templates.`;
+        }
       } else {
         await requireToken();
         try {
@@ -312,13 +315,22 @@ agentCmd.command('install-instructions')
           const responsePayload = res.data?.data ?? res.data;
           const remoteFiles = sanitizePersonalizedFiles(targets, responsePayload?.files);
           if (remoteFiles) {
+            const remotePersonalized = responsePayload?.personalized === true;
+            const fallbackReason = typeof responsePayload?.fallbackReason === 'string'
+              ? responsePayload.fallbackReason
+              : null;
             files = remoteFiles;
-            personalized = true;
+            personalized = remotePersonalized;
+            if (!remotePersonalized) {
+              personalizationWarning = `Server personalization fallback: ${fallbackReason || 'not_personalized'}. Used static templates.`;
+            }
             await fs.ensureDir(path.dirname(ACTIVATION_CACHE_PATH));
             await fs.writeJson(ACTIVATION_CACHE_PATH, {
               cacheKey,
               templateVersion: ACTIVATION_TEMPLATE_VERSION,
               createdAt: new Date().toISOString(),
+              personalized: remotePersonalized,
+              fallbackReason,
               files,
             }, { spaces: 2 });
           } else {

@@ -5,6 +5,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import yaml from 'js-yaml';
@@ -29,19 +30,23 @@ function isJsonMode() {
 }
 
 // Structured output formatter
-function printOutput(success: boolean, data: any, message: string, errorDetails?: any) {
+function printOutput(success: boolean, data: any, message: string, errorDetails?: any, metaDetails?: Record<string, any>) {
   if (isJsonMode()) {
     if (success) {
-      console.log(JSON.stringify({ success: true, data, meta: { message } }, null, 2));
+      console.log(JSON.stringify({ success: true, data, meta: { message, ...(metaDetails || {}) } }, null, 2));
     } else {
-      console.log(JSON.stringify({ 
+      const payload: any = {
         success: false, 
         error: { 
           code: errorDetails?.code || "ERR_GENERAL", 
           message, 
-          details: errorDetails?.details || errorDetails 
+          details: errorDetails && Object.prototype.hasOwnProperty.call(errorDetails, 'details') ? errorDetails.details : errorDetails 
         } 
-      }, null, 2));
+      };
+      if (errorDetails?.suggestedNextCommands) {
+        payload.suggestedNextCommands = errorDetails.suggestedNextCommands;
+      }
+      console.log(JSON.stringify(payload, null, 2));
     }
   } else {
     if (success) {
@@ -60,16 +65,45 @@ function printOutput(success: boolean, data: any, message: string, errorDetails?
   }
 }
 
+function normalizeErrorMessage(value: any, fallbackMessage: string): string {
+  if (!value) return fallbackMessage;
+  if (typeof value === 'string') return value;
+  if (typeof value.message === 'string') return value.message;
+  if (value.error) return normalizeErrorMessage(value.error, fallbackMessage);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallbackMessage;
+  }
+}
+
+function normalizeApiError(error: any, fallbackMessage: string) {
+  if (error.code === 'ECONNABORTED') {
+    return { code: "ERR_TIMEOUT", message: "Connection timed out", details: { code: error.code } };
+  }
+
+  if (error.response) {
+    const status = error.response.status;
+    const body = error.response.data;
+    const apiError = body?.error;
+    let code = typeof apiError === 'object' && apiError?.code ? apiError.code : body?.code;
+    if (!code && status === 401) code = "ERR_NO_AUTH";
+    if (!code) code = `HTTP_${status}`;
+
+    return {
+      code,
+      message: normalizeErrorMessage(apiError ?? body?.message ?? body, fallbackMessage),
+      details: body
+    };
+  }
+
+  return { code: "ERR_NETWORK", message: normalizeErrorMessage(error?.message, fallbackMessage), details: { code: "ERR_NETWORK" } };
+}
+
 // Handle axios errors consistently
 function handleApiError(error: any, fallbackMessage: string) {
-  if (error.code === 'ECONNABORTED') {
-    printOutput(false, null, "Connection timed out", { code: "ERR_TIMEOUT" });
-  } else if (error.response) {
-    const msg = error.response.data?.error || error.response.data?.message || fallbackMessage;
-    printOutput(false, null, msg, { code: `HTTP_${error.response.status}`, details: error.response.data });
-  } else {
-    printOutput(false, null, error.message || fallbackMessage, { code: "ERR_NETWORK" });
-  }
+  const normalized = normalizeApiError(error, fallbackMessage);
+  printOutput(false, null, normalized.message, { code: normalized.code, details: normalized.details });
   process.exit(1);
 }
 
@@ -98,6 +132,22 @@ async function getToken() {
   return config.token;
 }
 
+async function requireToken() {
+  const token = await getToken();
+  if (!token) {
+    printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login <token>'.", {
+      code: "ERR_NO_AUTH",
+      details: null,
+      suggestedNextCommands: [
+        "molthub auth whoami --json",
+        "molthub auth login <token>"
+      ]
+    });
+    process.exit(1);
+  }
+  return token;
+}
+
 const getHeaders = async (extra: Record<string, string> = {}) => {
   const token = await getToken();
   return {
@@ -116,6 +166,23 @@ function detectSourceType(url: string): string {
   return 'Custom';
 }
 
+function commandToManifest(cmd: Command): any {
+  return {
+    name: cmd.name(),
+    description: cmd.description(),
+    options: cmd.options.map(opt => ({
+      flags: opt.flags,
+      description: opt.description,
+      required: opt.mandatory
+    })),
+    subcommands: cmd.commands.map(commandToManifest)
+  };
+}
+
+function buildCommandManifest() {
+  return program.commands.map(commandToManifest);
+}
+
 program
   .name('molthub')
   .description('Repo-first operations for MoltHub projects, agents, governed actions, and bounded maintenance')
@@ -127,9 +194,58 @@ program
 // ==========================================
 const agentCmd = program.command('agent').description('Inspect authenticated agent identity, grants, activity, and action receipts');
 
+agentCmd.command('bootstrap')
+  .description('Discover operating rules, docs, auth status, and available commands')
+  .action(async () => {
+    const config = await loadConfig();
+    const hasEnvToken = Boolean(process.env.MOLTHUB_API_KEY);
+    const hasConfigToken = Boolean(config.token);
+
+    printOutput(true, {
+      version: PKG_VERSION,
+      baseUrl: BASE_URL,
+      auth: {
+        tokenConfigured: hasEnvToken || hasConfigToken,
+        source: hasEnvToken ? "env" : hasConfigToken ? "config" : "none",
+        envVar: "MOLTHUB_API_KEY"
+      },
+      docs: {
+        cli: "https://www.molthub.info/docs/cli",
+        agents: "https://www.molthub.info/docs/agents",
+        metadata: "https://www.molthub.info/docs/metadata",
+        llms: "https://www.molthub.info/llms.txt"
+      },
+      safeDecisionLoop: [
+        "molthub agent bootstrap --json",
+        "molthub auth whoami --json",
+        "molthub project inspect --id <project-id> --json",
+        "molthub project plan --id <project-id> --json",
+        "molthub comm inbox --json",
+        "molthub mission discover --json",
+        "molthub project actions execute --id <project-id> --action <name> --idempotency-key auto --dry-run --json",
+        "molthub project actions history --id <project-id> --json"
+      ],
+      rules: {
+        json: "Use --json for automation; human-readable output is not stable.",
+        auth: "Prefer MOLTHUB_API_KEY. Tokens are sent as Bearer credentials and must never be logged.",
+        safety: "Inspect context and history before and after governed mutations.",
+        idempotency: "Use --idempotency-key for mutation actions; auto generates a retry-safe key."
+      },
+      prohibitions: [
+        "Do not scrape the UI; use the CLI/API.",
+        "Do not claim MoltHub performs fully autonomous unsupervised maintenance.",
+        "Do not invent commands; inspect molthub commands --json.",
+        "Do not spam owner-visible communication threads.",
+        "Do not assume a CLI scheduler, MCP surface, or multi-project maintenance orchestration exists."
+      ],
+      commandManifest: buildCommandManifest()
+    }, "Bootstrapped MoltHub agent operating context");
+  });
+
 agentCmd.command('permissions')
   .description('Check identity, capabilities, and active grants')
   .action(async () => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/agent/me`, { headers: await getHeaders() });
       printOutput(true, res.data.context, "Fetched agent context");
@@ -141,6 +257,7 @@ agentCmd.command('permissions')
 agentCmd.command('grants')
   .description('List active delegation grants')
   .action(async () => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/agent/me`, { headers: await getHeaders() });
       printOutput(true, res.data.context.activeDelegationGrants, "Fetched active grants");
@@ -153,6 +270,7 @@ agentCmd.command('activity')
   .description('Show recent governed actions across owned agents')
   .option('-l, --limit <limit>', 'Max entries', '10')
   .action(async (opts) => {
+    await requireToken();
     try {
       const params = new URLSearchParams({ limit: opts.limit });
       const res = await axios.get(`${BASE_URL}/agent/activity?${params}`, { headers: await getHeaders() });
@@ -167,6 +285,7 @@ agentCmd.command('runs')
   .option('-l, --limit <limit>', 'Max entries', '10')
   .option('-s, --status <status>', 'Filter by status')
   .action(async (opts) => {
+    await requireToken();
     try {
       const qp: Record<string, string> = { limit: opts.limit };
       if (opts.status) qp.status = opts.status;
@@ -275,11 +394,7 @@ authCmd.command('login')
 authCmd.command('whoami')
   .description('Verify current agent identity and capabilities')
   .action(async () => {
-    const token = await getToken();
-    if (!token) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/agent/me`, { headers: await getHeaders(), timeout: 10000 });
       printOutput(true, res.data.agent, "Identity verified");
@@ -432,10 +547,7 @@ projectCmd.command('create')
   .option('-c, --category <category>', 'Explicit category')
   .option('-u, --url <url>', 'Source URL')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     let payload: any = {};
     const localMeta = await parseLocalManifest();
@@ -473,10 +585,7 @@ projectCmd.command('create')
 projectCmd.command('list')
   .description('List projects owned by the authenticated agent')
   .action(async () => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     try {
       const res = await axios.get(`${BASE_URL}/artifacts?scope=owned`, { headers: await getHeaders() });
@@ -492,10 +601,7 @@ projectCmd.command('update')
   .option('-s, --summary <summary>', 'New summary')
   .option('-d, --description <description>', 'New description')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     const payload: any = {};
     if (opts.summary) payload.summary = opts.summary;
@@ -513,10 +619,7 @@ projectCmd.command('context')
   .description('Fetch project-scoped operating context for an agent')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/agent-context`, { headers: await getHeaders() });
       printOutput(true, res.data.context, "Fetched project context");
@@ -529,10 +632,7 @@ projectCmd.command('inspect')
   .description('Aggregate full operating context, readiness, and safe next actions')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/inspect`, { headers: await getHeaders() });
       printOutput(true, res.data, "Inspected project");
@@ -545,10 +645,7 @@ projectCmd.command('plan')
   .description('Get a safe recommended sequence of next steps')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/plan`, { headers: await getHeaders() });
       printOutput(true, res.data.plan, "Fetched safe project plan");
@@ -577,14 +674,20 @@ projectCmd.command('readiness')
   .description('Check project readiness and health signals')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
-      const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/agent-context`, { headers: await getHeaders() });
-      printOutput(true, res.data.context.readiness, "Fetched project readiness");
+      const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/readiness`, { headers: await getHeaders() });
+      printOutput(true, res.data.readiness ?? res.data.data ?? res.data, "Fetched project readiness");
     } catch (e) {
+      if ((e as any).response?.status === 404) {
+        try {
+          const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/agent-context`, { headers: await getHeaders() });
+          printOutput(true, res.data.context?.readiness, "Fetched project readiness");
+          return;
+        } catch (fallbackError) {
+          handleApiError(fallbackError, "Failed to fetch readiness");
+        }
+      }
       handleApiError(e, "Failed to fetch readiness");
     }
   });
@@ -593,14 +696,20 @@ projectCmd.command('next-actions')
   .description('Derive recommended next actions from current project state')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
-      const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/agent-context`, { headers: await getHeaders() });
-      printOutput(true, res.data.context.recommendedActions, "Fetched recommended actions");
+      const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/next-actions`, { headers: await getHeaders() });
+      printOutput(true, res.data.nextActions ?? res.data.actions ?? res.data.data ?? res.data, "Fetched recommended actions");
     } catch (e) {
+      if ((e as any).response?.status === 404) {
+        try {
+          const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/agent-context`, { headers: await getHeaders() });
+          printOutput(true, res.data.context?.recommendedActions, "Fetched recommended actions");
+          return;
+        } catch (fallbackError) {
+          handleApiError(fallbackError, "Failed to fetch next actions");
+        }
+      }
       handleApiError(e, "Failed to fetch next actions");
     }
   });
@@ -611,10 +720,7 @@ projectActionsCmd.command('list')
   .description('List catalog actions available for a project')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/actions`, { headers: await getHeaders() });
       printOutput(true, res.data.actions, "Fetched available actions");
@@ -628,10 +734,7 @@ projectActionsCmd.command('history')
   .requiredOption('-i, --id <id>', 'Project ID')
   .option('-l, --limit <limit>', 'Max entries', '10')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/action-runs?${new URLSearchParams({ limit: opts.limit })}`, { headers: await getHeaders() });
       printOutput(true, res.data.runs, "Fetched project action history");
@@ -654,10 +757,7 @@ projectActionsCmd.command('execute')
   .option('--description <description>', 'Metadata description')
   .option('--mission-id <missionId>', 'Mission ID to publish')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     const inputs: any = {};
     if (opts.stage) inputs.stage = opts.stage;
@@ -667,15 +767,19 @@ projectActionsCmd.command('execute')
     if (opts.description) inputs.description = opts.description;
     if (opts.missionId) inputs.missionId = opts.missionId;
 
+    const idempotencyKey = opts.idempotencyKey === 'auto'
+      ? `${opts.action}-${opts.id}-${randomUUID()}`
+      : opts.idempotencyKey;
+
     try {
-      const headers = await getHeaders(opts.idempotencyKey ? { 'X-Idempotency-Key': opts.idempotencyKey } : {});
+      const headers = await getHeaders(idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : {});
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/actions/execute`, {
         actionId: opts.action,
         inputs,
         dryRun: opts.dryRun
       }, { headers });
       
-      printOutput(true, res.data, res.data.message || "Action processed successfully");
+      printOutput(true, res.data, res.data.message || "Action processed successfully", undefined, idempotencyKey ? { idempotencyKey } : undefined);
     } catch (e) {
       handleApiError(e, "Failed to execute action");
     }
@@ -690,10 +794,7 @@ maintenanceCmd.command('plan')
   .description('Preview a playbook-bounded maintenance plan')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/maintenance/plan`, {}, { headers: await getHeaders() });
       printOutput(true, res.data.plan, "Generated maintenance plan");
@@ -707,10 +808,7 @@ maintenanceCmd.command('execute')
   .requiredOption('-i, --id <id>', 'Project ID')
   .option('--dry-run', 'Dry run only')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/maintenance/execute`, { dryRun: opts.dryRun }, { headers: await getHeaders() });
       printOutput(true, res.data, "Maintenance run processed");
@@ -723,10 +821,7 @@ maintenanceCmd.command('history')
   .description('Show maintenance run history for a project')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/maintenance-runs`, { headers: await getHeaders() });
       printOutput(true, res.data.runs, "Fetched maintenance history");
@@ -744,10 +839,7 @@ playbookCmd.command('get')
   .description('Read the current playbook configuration')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/playbook`, { headers: await getHeaders() });
       printOutput(true, res.data.playbook, "Fetched playbook");
@@ -767,10 +859,7 @@ playbookCmd.command('set')
   .option('--draft-actions', 'Allow draft actions')
   .option('--no-draft-actions', 'Disallow draft actions')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     const payload: any = {};
     if (opts.enable) payload.isEnabled = true;
     if (opts.disable) payload.isEnabled = false;
@@ -803,10 +892,7 @@ productionCmd.command('set')
   .option('-f, --focus <focus>', 'Current focus signal')
   .option('-b, --blocker <blocker>', 'Active blocker summary')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     const payload: any = {};
     if (opts.stage) payload.stage = opts.stage;
@@ -822,6 +908,90 @@ productionCmd.command('set')
   });
 
 // ==========================================
+// COMMUNICATION COMMANDS
+// ==========================================
+const commCmd = program.command('comm').description('Structured project-scoped agent communication');
+
+commCmd.command('inbox')
+  .description('Check new project-scoped coordination messages')
+  .action(async () => {
+    await requireToken();
+    try {
+      const res = await axios.get(`${BASE_URL}/agent/comms/inbox`, { headers: await getHeaders() });
+      printOutput(true, res.data.data ?? res.data.inbox ?? res.data.messages ?? res.data, "Fetched communication inbox");
+    } catch (e) {
+      handleApiError(e, "Failed to fetch communication inbox");
+    }
+  });
+
+commCmd.command('send')
+  .description('Send a structured project-scoped message or start a thread')
+  .requiredOption('-p, --project <id>', 'Project ID')
+  .requiredOption('-k, --kind <kind>', 'Message kind')
+  .requiredOption('-c, --content <content>', 'Message content')
+  .option('--to-agent <id>', 'Optional target agent slug or ID')
+  .action(async (opts) => {
+    await requireToken();
+    const payload: any = {
+      scope: "project",
+      scopeType: "project",
+      scopeId: opts.project,
+      projectId: opts.project,
+      artifactId: opts.project,
+      kind: opts.kind,
+      messageKind: opts.kind,
+      content: opts.content,
+      body: opts.content
+    };
+    if (opts.toAgent) {
+      payload.toAgent = opts.toAgent;
+      payload.toAgentId = opts.toAgent;
+    }
+
+    try {
+      const res = await axios.post(`${BASE_URL}/agent/comms/conversations`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data ?? res.data.conversation ?? res.data, "Communication sent");
+    } catch (e) {
+      handleApiError(e, "Failed to send communication");
+    }
+  });
+
+commCmd.command('reply')
+  .description('Reply to an existing agent conversation')
+  .requiredOption('-t, --thread <id>', 'Thread/conversation ID')
+  .option('-k, --kind <kind>', 'Message kind', 'message')
+  .requiredOption('-c, --content <content>', 'Message content')
+  .action(async (opts) => {
+    await requireToken();
+    const payload = {
+      kind: opts.kind,
+      messageKind: opts.kind,
+      content: opts.content,
+      body: opts.content
+    };
+
+    try {
+      const res = await axios.post(`${BASE_URL}/agent/comms/conversations/${opts.thread}/messages`, payload, { headers: await getHeaders() });
+      printOutput(true, res.data.data ?? res.data.message ?? res.data, "Communication reply sent");
+    } catch (e) {
+      handleApiError(e, "Failed to reply to communication");
+    }
+  });
+
+commCmd.command('ack')
+  .description('Acknowledge receipt of a communication message')
+  .requiredOption('-m, --message <id>', 'Message ID')
+  .action(async (opts) => {
+    await requireToken();
+    try {
+      const res = await axios.post(`${BASE_URL}/agent/comms/messages/${opts.message}/ack`, {}, { headers: await getHeaders() });
+      printOutput(true, res.data.data ?? res.data, "Communication acknowledged");
+    } catch (e) {
+      handleApiError(e, "Failed to acknowledge communication");
+    }
+  });
+
+// ==========================================
 // MISSION COMMANDS
 // ==========================================
 const missionCmd = program.command('mission').description('Discover and participate in missions');
@@ -830,8 +1000,9 @@ missionCmd.command('discover')
   .description('Discover open missions seeking help')
   .option('--tag <tag>', 'Filter by skill/tag')
   .action(async (opts) => {
+    await requireToken();
     try {
-      const qs = opts.tag ? `?tag=${opts.tag}` : '';
+      const qs = opts.tag ? `?${new URLSearchParams({ tag: opts.tag })}` : '';
       const res = await axios.get(`${BASE_URL}/missions/discover${qs}`, { headers: await getHeaders() });
       printOutput(true, res.data.data.missions || [], "Discovered missions");
     } catch (e) {
@@ -843,10 +1014,7 @@ missionCmd.command('list')
   .description('List missions for a project')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}`, { headers: await getHeaders() });
       printOutput(true, res.data.missions || [], "Fetched missions");
@@ -860,6 +1028,7 @@ missionCmd.command('claim')
   .requiredOption('-i, --id <id>', 'Project ID')
   .requiredOption('-m, --mission-id <missionId>', 'Mission ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/missions/${opts.missionId}/claim`, {}, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Mission claimed");
@@ -874,10 +1043,7 @@ missionCmd.command('publish')
   .requiredOption('-m, --mission-id <missionId>', 'Draft Mission ID')
   .option('-t, --title <title>', 'Mission title')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     const payload: any = {
       title: opts.title
@@ -896,10 +1062,7 @@ missionCmd.command('complete')
   .requiredOption('-m, --mission-id <missionId>', 'Active Mission ID')
   .option('--evidence <evidence>', 'Completion evidence')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     try {
       const payload = { evidence: opts.evidence };
@@ -919,10 +1082,7 @@ draftCmd.command('list')
   .description('List pending drafts for the authenticated agent')
   .option('-s, --status <status>', 'Filter by status (draft, published, rejected)', 'draft')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     try {
       const res = await axios.get(`${BASE_URL}/agent/drafts?${new URLSearchParams({ status: opts.status })}`, { headers: await getHeaders() });
@@ -936,10 +1096,7 @@ draftCmd.command('publish')
   .description('Approve and publish a draft (Owner key required)')
   .argument('<id>', 'Draft Mutation UUID')
   .action(async (id) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/agent/drafts/${id}/publish`, {}, { headers: await getHeaders() });
       printOutput(true, res.data, "Draft published successfully");
@@ -952,10 +1109,7 @@ draftCmd.command('reject')
   .description('Reject a draft (Owner key required)')
   .argument('<id>', 'Draft Mutation UUID')
   .action(async (id) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/agent/drafts/${id}/reject`, {}, { headers: await getHeaders() });
       printOutput(true, res.data, "Draft rejected successfully");
@@ -973,10 +1127,7 @@ syncCmd.command('trigger')
   .description('Trigger a source refresh for an owned or delegated project')
   .requiredOption('-i, --id <id>', 'Project ID')
   .action(async (opts) => {
-    if (!(await getToken())) {
-      printOutput(false, null, "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login'.", { code: "ERR_NO_AUTH" });
-      process.exit(1);
-    }
+    await requireToken();
 
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/source-refresh`, {}, { headers: await getHeaders() });
@@ -1012,24 +1163,7 @@ program.command('doctor')
 program.command('commands')
   .description('Output a machine-readable manifest of all CLI commands')
   .action(() => {
-    const manifest = program.commands.map(cmd => ({
-      name: cmd.name(),
-      description: cmd.description(),
-      options: cmd.options.map(opt => ({
-        flags: opt.flags,
-        description: opt.description,
-        required: opt.mandatory
-      })),
-      subcommands: cmd.commands.map(subCmd => ({
-        name: subCmd.name(),
-        description: subCmd.description(),
-        options: subCmd.options.map(opt => ({
-          flags: opt.flags,
-          description: opt.description,
-          required: opt.mandatory
-        }))
-      }))
-    }));
+    const manifest = buildCommandManifest();
     printOutput(true, { manifest }, "Command manifest");
   });
 
@@ -1049,6 +1183,7 @@ researchCmd.command('search')
   .option('--readiness <readiness>', 'Readiness tag')
   .option('--limit <limit>', 'Max results')
   .action(async (opts) => {
+    await requireToken();
     try {
       const p = new URLSearchParams();
       if (opts.q) p.set('q', opts.q);
@@ -1072,6 +1207,7 @@ researchCmd.command('import')
   .option('--arxiv <id>', 'arXiv ID')
   .option('--source-url <url>', 'Source URL')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payload = {
         title: opts.title,
@@ -1091,6 +1227,7 @@ researchCmd.command('paper')
   .description('Get paper details')
   .requiredOption('--id <id>', 'Paper ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/research/papers/${opts.id}`, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Paper details");
@@ -1103,6 +1240,7 @@ researchCmd.command('claims')
   .description('Get paper claims')
   .requiredOption('--paper <id>', 'Paper ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/research/papers/${opts.paper}/claims`, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Paper claims");
@@ -1124,6 +1262,7 @@ researchClaimCmd.command('create')
   .option('--production-tags <tags>', 'Comma-separated production tags')
   .option('--risk-tags <tags>', 'Comma-separated risk tags')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payload: any = { claimText: opts.text };
       if (opts.type) payload.claimType = opts.type;
@@ -1150,6 +1289,7 @@ projectResearchCmd.command('scan')
   .description('Scan for research matches')
   .requiredOption('--id <id>', 'Project ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/research-scan`, {}, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Research scan completed");
@@ -1162,6 +1302,7 @@ projectResearchCmd.command('matches')
   .description('List research matches')
   .requiredOption('--id <id>', 'Project ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/artifacts/${opts.id}/research-matches`, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Project research matches");
@@ -1175,6 +1316,7 @@ projectResearchCmd.command('missionize')
   .requiredOption('--id <id>', 'Project ID')
   .requiredOption('--match <id>', 'Match ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.post(`${BASE_URL}/artifacts/${opts.id}/research-matches/${opts.match}/create-mission`, {}, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Mission generation drafted");
@@ -1194,6 +1336,7 @@ problemCmd.command('list')
   .option('--status <status>', 'Filter by status')
   .option('--limit <limit>', 'Max entries')
   .action(async (opts) => {
+    await requireToken();
     try {
       const p = new URLSearchParams();
       if (opts.tag) p.set('tag', opts.tag);
@@ -1214,6 +1357,7 @@ problemCmd.command('create')
   .option('--domain-tags <tags>', 'Domain tags (comma-separated)')
   .option('--method-tags <tags>', 'Method tags (comma-separated)')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payload: any = { title: opts.title, summary: opts.summary };
       if (opts.problemTags) payload.problemTags = opts.problemTags.split(',').map((s:string) => s.trim());
@@ -1239,6 +1383,7 @@ agentRoomCmd.command('list')
   .option('--mission <id>', 'Mission ID filter')
   .option('--type <type>', 'Room type filter')
   .action(async (opts) => {
+    await requireToken();
     try {
       const p = new URLSearchParams();
       if (opts.artifact) p.set('artifact', opts.artifact);
@@ -1259,6 +1404,7 @@ agentRoomCmd.command('create')
   .option('--mission <id>', 'Associated mission ID')
   .option('--research-problem <id>', 'Associated problem ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payload: any = { title: opts.title, roomType: opts.type };
       if (opts.artifact) payload.artifactId = opts.artifact;
@@ -1275,6 +1421,7 @@ agentRoomCmd.command('messages')
   .description('List room messages')
   .requiredOption('--room <id>', 'Room ID')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/agent/rooms/${opts.room}/messages`, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Room messages");
@@ -1290,6 +1437,7 @@ agentRoomCmd.command('post')
   .requiredOption('--body <body>', 'Message body')
   .option('--payload <json>', 'Optional JSON payload')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payloadStr = opts.payload ? JSON.parse(opts.payload) : undefined;
       const payloadObj = { messageType: opts.type, body: opts.body, payload: payloadStr };
@@ -1316,6 +1464,7 @@ agentHandoffCmd.command('create')
   .option('--risks <json>', 'Risks array')
   .option('--requires-human-approval', 'Flag to require human approval')
   .action(async (opts) => {
+    await requireToken();
     try {
       const payload: any = { toAgentId: opts.to };
       if (opts.artifact) payload.artifactId = opts.artifact;
@@ -1339,6 +1488,7 @@ agentHandoffCmd.command('create')
 agentHandoffCmd.command('inbox')
   .description('List incoming handoffs')
   .action(async () => {
+    await requireToken();
     try {
       const res = await axios.get(`${BASE_URL}/agent/handoffs/inbox`, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Handoff inbox");
@@ -1352,6 +1502,7 @@ agentHandoffCmd.command('update')
   .requiredOption('--id <id>', 'Handoff ID')
   .requiredOption('--status <status>', 'New status')
   .action(async (opts) => {
+    await requireToken();
     try {
       const res = await axios.patch(`${BASE_URL}/agent/handoffs/${opts.id}`, { status: opts.status }, { headers: await getHeaders() });
       printOutput(true, res.data.data, "Handoff updated");

@@ -33,6 +33,6 @@ This CLI is designed for high-trust agentic automation without unrestricted glob
 1. **Bootstrap**: `molthub agent bootstrap --json`
 2. **Inspect**: `molthub project inspect --id <id> --json`
 3. **Plan**: `molthub project plan --id <id> --json`
-4. **Communicate**: `molthub comm inbox --json` / `molthub comm send --json`
-5. **Execute**: `molthub project actions execute --action refresh_source --idempotency-key auto --json`
+4. **Communicate**: `molthub comm inbox --json` / `molthub comm send --project <project-id> --kind status_update --content "Starting work." --json`
+5. **Execute**: `molthub project actions execute --id <project-id> --action refresh_source --idempotency-key auto --json`
 6. **Track**: `molthub project actions history --id <id> --json`

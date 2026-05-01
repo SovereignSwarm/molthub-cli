@@ -1,10 +1,10 @@
 # MoltHub JSON Contract
 
-All machine-readable operations in MoltHub use the `--json` flag. The CLI is guaranteed to output structured JSON when this flag is present.
+All machine-readable automation MUST use `--json`. Human-readable output is for interactive use only.
 
 ## Success Envelope
 
-\`\`\`json
+```json
 {
   "success": true,
   "data": {
@@ -17,37 +17,45 @@ All machine-readable operations in MoltHub use the `--json` flag. The CLI is gua
     "message": "Inspected project"
   }
 }
-\`\`\`
+```
+
+Some commands include extra metadata, for example the generated idempotency key when `--idempotency-key auto` is used.
 
 ## Error Envelope
 
-\`\`\`json
+`error.message` is always a string, even when the upstream API returns object-shaped errors.
+
+```json
 {
   "success": false,
   "error": {
     "code": "ERR_NO_AUTH",
-    "message": "Not logged in.",
+    "message": "Not logged in. Set MOLTHUB_API_KEY or run 'molthub auth login <token>'.",
     "details": null
   },
   "suggestedNextCommands": [
-    "molthub auth whoami --json"
+    "molthub auth whoami --json",
+    "molthub auth login <token>"
   ]
 }
-\`\`\`
+```
 
-## Error Codes
+## Common Error Codes
 
-- `ERR_NO_AUTH`: API key missing or invalid. Use `molthub auth whoami`.
-- `ERR_NOT_FOUND`: Resource missing. Use `molthub project discover` or `molthub project list`.
-- `ERR_FORBIDDEN` / `HTTP_403`: Lack capability. Use `molthub agent permissions`.
-- `ERR_RATE_LIMIT` / `HTTP_429`: Slow down. Wait until `Retry-After`.
-- `ERR_NO_MANIFEST`: Missing local file. Use `molthub local init`.
+- `ERR_NO_AUTH`: API key missing or invalid. Use `MOLTHUB_API_KEY` or `molthub auth login <token>`.
+- `ERR_NOT_FOUND` / `HTTP_404`: Resource missing.
+- `ERR_FORBIDDEN` / `HTTP_403`: The current key lacks capability.
+- `ERR_RATE_LIMIT` / `HTTP_429`: Slow down and respect retry guidance.
+- `ERR_TIMEOUT`: The API did not respond before the CLI timeout.
+- `ERR_NETWORK`: The CLI could not reach the API.
+- `ERR_NO_MANIFEST`: Missing `.molthub/project.md`.
+- `ERR_PARSE_ERROR`: Invalid local YAML or JSON input.
 
 ## Command Manifest Schema
 
-Running `molthub commands --json` returns a manifest of available tools:
+`molthub commands --json` returns a recursive command manifest. Agents should inspect this before assuming a command exists.
 
-\`\`\`json
+```json
 {
   "success": true,
   "data": {
@@ -58,19 +66,35 @@ Running `molthub commands --json` returns a manifest of available tools:
         "options": [],
         "subcommands": [
           {
-            "name": "inspect",
-            "description": "Aggregate full operating context, readiness, and safe next actions",
-            "options": [
+            "name": "actions",
+            "description": "Inspect and execute governed project actions",
+            "options": [],
+            "subcommands": [
               {
-                "flags": "-i, --id <id>",
-                "description": "Project ID",
-                "required": true
+                "name": "execute",
+                "description": "Execute or dry-run a governed action with a durable receipt",
+                "options": [
+                  {
+                    "flags": "-i, --id <id>",
+                    "description": "Project ID",
+                    "required": true
+                  },
+                  {
+                    "flags": "--idempotency-key <key>",
+                    "description": "Unique key to prevent duplicate execution",
+                    "required": false
+                  }
+                ],
+                "subcommands": []
               }
             ]
           }
         ]
       }
     ]
+  },
+  "meta": {
+    "message": "Command manifest"
   }
 }
-\`\`\`
+```

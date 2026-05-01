@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
+import { execSync, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -7,6 +7,54 @@ const CLI_ABS_PATH = path.join(process.cwd(), 'src', 'index.ts');
 // --import is the modern (non-deprecated) API; ts-node/esm --loader generates warnings on Node 22+
 const CLI_PATH = `node --import "data:text/javascript,import{register}from'node:module';import{pathToFileURL}from'node:url';register('ts-node/esm',pathToFileURL('./'));" "${CLI_ABS_PATH}"`;
 const EXEC_TIMEOUT = 15000;
+
+function emptyAuthEnv(testDir: string, extra: Record<string, string> = {}) {
+  return {
+    ...process.env,
+    HOME: testDir,
+    USERPROFILE: testDir,
+    MOLTHUB_API_KEY: '',
+    ...extra,
+  };
+}
+
+function expectNoAuth(command: string, cwd: string) {
+  try {
+    execSync(`${CLI_PATH} ${command}`, {
+      cwd,
+      stdio: 'pipe',
+      timeout: EXEC_TIMEOUT,
+      env: emptyAuthEnv(cwd),
+    });
+    throw new Error('Should have failed');
+  } catch (e: any) {
+    const output = `${e.stdout?.toString() || ''}`.trim();
+    const parsed = JSON.parse(output);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error.code).toBe('ERR_NO_AUTH');
+    expect(typeof parsed.error.message).toBe('string');
+  }
+}
+
+function waitForServerReady(server: ChildProcessWithoutNullStreams) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('server did not start')), 5000);
+    server.stdout.on('data', (chunk) => {
+      if (chunk.toString().includes('READY')) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    server.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      if (text.includes('EADDRINUSE') || text.includes('Error')) {
+        clearTimeout(timer);
+        reject(new Error(text));
+      }
+    });
+  });
+}
 
 describe('MoltHub CLI Beta Alignment', () => {
   let testDir: string;
@@ -72,6 +120,24 @@ tasks: ["task1"]
     expect(parsed.data._warnings).toContain("Missing recommended field: 'source_url'");
     expect(parsed.data._warnings.some((w: string) => w.includes("'tasks'"))).toBe(true);
     });
+
+  it('agent bootstrap emits JSON operating context with suffix flag placement', () => {
+    const output = execSync(`${CLI_PATH} agent bootstrap --json`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString().trim();
+    const parsed = JSON.parse(output);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data.version).toBe('3.2.0');
+    expect(parsed.data.safeDecisionLoop).toContain('molthub agent bootstrap --json');
+    expect(parsed.data.commandManifest.some((cmd: any) => cmd.name === 'comm')).toBe(true);
+  });
+
+  it('agent bootstrap also supports leading global JSON flag placement', () => {
+    const output = execSync(`${CLI_PATH} --json agent bootstrap`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString().trim();
+    const parsed = JSON.parse(output);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data.auth.envVar).toBe('MOLTHUB_API_KEY');
+  });
 
   it('AGENTS.md exists and contains essential automation rules', () => {
     const agentsPath = path.join(process.cwd(), 'AGENTS.md');
@@ -144,6 +210,75 @@ summary: "A valid summary"
     expect(output).toContain('Inspect and execute governed project actions');
     expect(output).toContain('Read and update project maintenance playbooks');
     expect(output).not.toContain('artifact-scoped operating context');
+  });
+
+  it('commands manifest recursively lists nested command groups', () => {
+    const output = execSync(`${CLI_PATH} commands --json`, { cwd: testDir, timeout: EXEC_TIMEOUT }).toString().trim();
+    const parsed = JSON.parse(output);
+
+    const project = parsed.data.manifest.find((cmd: any) => cmd.name === 'project');
+    const actions = project.subcommands.find((cmd: any) => cmd.name === 'actions');
+    const execute = actions.subcommands.find((cmd: any) => cmd.name === 'execute');
+    const comm = parsed.data.manifest.find((cmd: any) => cmd.name === 'comm');
+    const reply = comm.subcommands.find((cmd: any) => cmd.name === 'reply');
+
+    expect(execute.options.some((opt: any) => opt.flags.includes('--idempotency-key'))).toBe(true);
+    expect(reply.options.some((opt: any) => opt.flags.includes('--thread'))).toBe(true);
+  });
+
+  it('comm commands are registered and fail locally with ERR_NO_AUTH when no token is configured', () => {
+    expectNoAuth('comm inbox --json', testDir);
+    expectNoAuth('comm send --project project-1 --kind status_update --content "Starting work" --json', testDir);
+    expectNoAuth('comm reply --thread thread-1 --content "Acknowledged" --json', testDir);
+    expectNoAuth('comm ack --message message-1 --json', testDir);
+  });
+
+  it('agent, mission, research, room, and handoff commands guard auth before network calls', () => {
+    [
+      'agent permissions --json',
+      'mission discover --json',
+      'mission claim --id project-1 --mission-id mission-1 --json',
+      'research import --title "Paper" --json',
+      'project research scan --id project-1 --json',
+      'problem create --title "Problem" --summary "Summary" --json',
+      'agent room list --json',
+      'agent handoff create --to agent-2 --json',
+    ].forEach((cmd) => expectNoAuth(cmd, testDir));
+  }, 30000);
+
+  it('normalizes object-shaped API errors into string messages', async () => {
+    const port = 39000 + Math.floor(Math.random() * 2000);
+    const server = spawn(process.execPath, ['-e', `
+      const http = require('http');
+      http.createServer((req, res) => {
+        res.writeHead(401, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: { code: 'ERR_NO_AUTH', message: 'Invalid API Key' } }));
+      }).listen(${port}, '127.0.0.1', () => console.log('READY'));
+    `], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    try {
+      await waitForServerReady(server);
+      execSync(`${CLI_PATH} --json auth whoami`, {
+        cwd: testDir,
+        stdio: 'pipe',
+        timeout: EXEC_TIMEOUT,
+        env: emptyAuthEnv(testDir, {
+          MOLTHUB_API_KEY: 'fake-token',
+          MOLTHUB_BASE_URL: `http://127.0.0.1:${port}/api/v1`,
+        }),
+      });
+      throw new Error('Should have failed');
+    } catch (e: any) {
+      const output = `${e.stdout?.toString() || ''}`.trim();
+      const parsed = JSON.parse(output);
+
+      expect(parsed.success).toBe(false);
+      expect(parsed.error.code).toBe('ERR_NO_AUTH');
+      expect(parsed.error.message).toBe('Invalid API Key');
+      expect(typeof parsed.error.message).toBe('string');
+    } finally {
+      server.kill();
+    }
   });
 
   it('project list requires auth before it attempts an owned-artifact lookup', () => {

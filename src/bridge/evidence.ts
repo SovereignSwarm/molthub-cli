@@ -119,6 +119,7 @@ function isLikelyCommitSha(value: string) {
 function buildEvidenceSummary(fields: BridgeEvidenceFields) {
   const lines = [
     fields.executorUsed ? `Executor used: ${fields.executorUsed}` : null,
+    fields.prUrl && !isUrl(fields.prUrl) ? `PR / MR note: ${fields.prUrl}` : null,
     fields.testsRun ? `Tests run: ${fields.testsRun}` : null,
     fields.resultSummary ? `Result summary: ${fields.resultSummary}` : null,
     fields.issuesBlockers ? `Issues / blockers: ${fields.issuesBlockers}` : null,
@@ -150,7 +151,7 @@ export function buildSourceEvidencePayload(fields: BridgeEvidenceFields): Source
     }
   }
 
-  if (fields.prUrl) payload.pullRequestUrl = fields.prUrl;
+  if (fields.prUrl && isUrl(fields.prUrl)) payload.pullRequestUrl = fields.prUrl;
   if (fields.changedPaths.length > 0) payload.changedPaths = fields.changedPaths;
 
   return payload;

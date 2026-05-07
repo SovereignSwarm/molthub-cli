@@ -76,6 +76,56 @@ Memory update notes:
     });
   });
 
+  it('keeps non-URL PR text out of the pull request URL field', () => {
+    const fields = parseEvidenceTemplate(`# MoltHub Mission Evidence
+
+Mission: Local Bridge MVP
+Packet checksum: packet-123
+Executor used: Codex manual local dogfood
+Branch: main
+Commit: abcdef1234567890
+PR URL: No PR. Owner approved direct push after local review.
+Changed paths: README.md
+Tests run: git diff --check HEAD
+Result summary: Added project documentation.
+Issues / blockers: None.
+Memory update notes: .molthub/project.md is canonical.
+`);
+
+    const payload = buildSourceEvidencePayload(fields);
+
+    expect(payload.pullRequestUrl).toBeUndefined();
+    expect(payload.evidenceSummary).toContain(
+      'PR / MR note: No PR. Owner approved direct push after local review.',
+    );
+  });
+
+  it('preserves readable line breaks in normalized evidence summaries', () => {
+    const fields = parseEvidenceTemplate(`# MoltHub Mission Evidence
+
+Mission: Local Bridge MVP
+Packet checksum: packet-123
+Executor used: Codex manual local dogfood
+Branch: main
+Commit: abcdef1234567890
+PR URL:
+Changed paths:
+- README.md
+- .molthub/project.md
+Tests run: git status --branch --short
+git diff --check HEAD
+Result summary: Added project documentation.
+Issues / blockers: None.
+Memory update notes: .molthub/project.md is canonical.
+`);
+
+    const summary = buildSourceEvidencePayload(fields).evidenceSummary;
+
+    expect(summary).toContain('Executor used: Codex manual local dogfood\n');
+    expect(summary).toContain('Tests run: git status --branch --short\ngit diff --check HEAD\n');
+    expect(summary).toContain('Result summary: Added project documentation.\n');
+  });
+
   it('rejects evidence with no result summary before API mutation', () => {
     const fields = parseEvidenceTemplate(EVIDENCE_TEMPLATE);
 

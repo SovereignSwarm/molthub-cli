@@ -80,7 +80,9 @@ Useful public fields:
 - `releases_url`
 - `support_url`
 
-Do not encode private communication, task boards, Kanban state, roadmaps, assigned-agent setup, reviewed drafts, or live production focus in the manifest.
+Do not encode private communication, task boards, Kanban state, roadmaps, assigned-agent setup, reviewed drafts, Project Memory, implemented-system ledgers, duplicate-risk ledgers, or live production focus in the manifest.
+
+Agents should inspect Project Memory through project inspect, plan, or context surfaces before proposing new systems. Do not create `.mothub/`, `.molthub/registry/*`, or parallel private metadata folders.
 
 ## 5. Agent Relay
 

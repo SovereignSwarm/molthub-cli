@@ -109,6 +109,9 @@ describe('MoltHub CLI Beta Alignment', () => {
 title: "Test"
 category: "Agent"
 tasks: ["task1"]
+implemented_systems: ["source sync"]
+project_memory:
+  duplicate_risks: ["parallel registry"]
 ---
 # Body`;
     fs.writeFileSync(path.join(testDir, '.molthub', 'project.md'), manifest);
@@ -119,6 +122,8 @@ tasks: ["task1"]
     expect(parsed.success).toBe(true);
     expect(parsed.data._warnings).toContain("Missing recommended field: 'source_url'");
     expect(parsed.data._warnings.some((w: string) => w.includes("'tasks'"))).toBe(true);
+    expect(parsed.data._warnings.some((w: string) => w.includes("'implemented_systems'"))).toBe(true);
+    expect(parsed.data._warnings.some((w: string) => w.includes("'project_memory'"))).toBe(true);
     });
 
   it('agent bootstrap emits JSON operating context with suffix flag placement', () => {
@@ -187,6 +192,7 @@ tasks: ["task1"]
     expect(content).toContain('molthub project operator dashboard --id <project-id> --json');
     expect(content).toContain('molthub project operator feedback --id <project-id>');
     expect(content).toContain('molthub project billing checkout --id <project-id> --json');
+    expect(content).toContain('Consult Project Memory through project inspect or plan');
     expect(content).toContain('Keep README.md, AGENTS.md, and `.molthub/project.md` aligned');
     expect(content).toContain('Do not log, print, commit, or transmit API keys');
     expect(content).toContain('Do not assume a CLI scheduler');

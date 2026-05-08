@@ -262,19 +262,21 @@ agentCmd.command('bootstrap')
       repoStewardship: [
         "Keep README.md, AGENTS.md, and .molthub/project.md aligned",
         "Use .molthub/project.md for durable public metadata, not private tasks or live PM state",
+        "Consult Project Memory through project inspect/plan/context before proposing new systems",
         "Refresh installed instructions when MoltHub workflow guidance changes",
         "Verify action, maintenance, operator, or project history after mutations"
       ],
       rules: {
         json: "Use --json for automation; human-readable output is not stable.",
         auth: "Prefer MOLTHUB_API_KEY. Tokens are sent as Bearer credentials and must never be logged.",
-        safety: "Inspect context and history before and after governed mutations.",
+        safety: "Inspect Project Memory, context, and history before and after governed mutations.",
         idempotency: "Use --idempotency-key for mutation actions; auto generates a retry-safe key."
       },
       prohibitions: [
         "Do not scrape the UI; use the CLI/API.",
         "Do not claim MoltHub performs fully autonomous unsupervised maintenance.",
         "Do not invent commands; inspect molthub commands --json.",
+        "Do not create .mothub/ or put private Project Memory into .molthub/project.md.",
         "Do not spam owner-visible communication threads.",
         "Do not assume a CLI scheduler, MCP surface, or multi-project maintenance orchestration exists."
       ],
@@ -658,7 +660,23 @@ localCmd.command('validate')
       if (!meta.source_url) warnings.push("Missing recommended field: 'source_url'");
 
       // PM-style fields (warn only)
-      const pmKeys = ['tasks', 'roadmap', 'kanban', 'assigned_agent', 'drafts', 'nextMission', 'currentFocus'];
+      const pmKeys = [
+        'tasks',
+        'roadmap',
+        'kanban',
+        'assigned_agent',
+        'assigned_agents',
+        'drafts',
+        'reviewed_drafts',
+        'nextMission',
+        'currentFocus',
+        'implemented_systems',
+        'memory',
+        'project_memory',
+        'production_memory',
+        'duplicate_risks',
+        'private_comms',
+      ];
       pmKeys.forEach(key => {
         if (meta[key] !== undefined) {
           warnings.push(`Field '${key}' is usually managed via Workbench or API; including it in the manifest may lead to sync conflicts.`);

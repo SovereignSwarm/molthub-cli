@@ -126,7 +126,7 @@ tasks: ["task1"]
     const parsed = JSON.parse(output);
 
     expect(parsed.success).toBe(true);
-    expect(parsed.data.version).toBe('3.3.3');
+    expect(parsed.data.version).toBe('3.4.0');
     expect(parsed.data.safeDecisionLoop).toContain('molthub agent bootstrap --json');
     expect(parsed.data.repoOnboardingLoop).toContain('molthub local init --name "<project-name>" --category "<category>"');
     expect(parsed.data.repoOnboardingLoop).toContain('molthub local validate --json');
@@ -281,7 +281,7 @@ tasks: ["task1"]
       expect(fs.readFileSync(countPath, 'utf8')).toBe('1');
       expect(sentBody).toMatchObject({
         templateVersion: '2026-05-02-v2',
-        cliVersion: '3.3.3',
+        cliVersion: '3.4.0',
         targets: ['agents'],
         manifestHash: 'missing',
       });

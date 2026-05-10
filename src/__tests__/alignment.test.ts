@@ -437,6 +437,20 @@ tasks: ["task1"]
     expect(content).toContain('ERR_INSTRUCTION_FILE_EXISTS');
     expect(content).toContain('personalizationWarning');
     expect(content).toContain('Repo onboarding');
+    expect(content).toContain('does not read or write a repo-controlled activation cache');
+    expect(content).toContain('disabled until signed packs exist');
+  });
+
+  it('public activation docs do not claim unsigned personalization is live', () => {
+    const readme = fs.readFileSync(path.join(process.cwd(), 'README.md'), 'utf8');
+    const skill = fs.readFileSync(path.join(process.cwd(), 'SKILL.md'), 'utf8');
+    const recipes = fs.readFileSync(path.join(process.cwd(), 'docs', 'agent-recipes.md'), 'utf8');
+
+    for (const content of [readme, skill, recipes]) {
+      expect(content).toContain('reserved for future signed activation packs');
+      expect(content).toContain('bundled static templates');
+      expect(content).not.toContain('server-brokered, budgeted, and cached');
+    }
   });
 
   it('local validate returns error for missing project.md', () => {

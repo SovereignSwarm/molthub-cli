@@ -69,7 +69,7 @@ molthub agent install-instructions --write --targets all --json
 
 The installed guidance acts as an agent-friendly MoltHub playbook. It explains what MoltHub is for, when agents should use it, how to bootstrap safely, how to initialize `.molthub/project.md`, which public fields to maintain, how to keep README/agent docs/manifest content aligned, how to coordinate through comms and missions, how to inspect Active Project command centers, and how to dry-run and verify governed actions.
 
-The default preview and `--write` modes use bundled static templates and make zero MoltHub or DeepSeek API calls. Optional personalization is explicit, authenticated, server-brokered, budgeted, and cached by repo fingerprint:
+The default preview and `--write` modes use bundled static templates and make zero MoltHub or DeepSeek API calls. `--personalize` is reserved for future signed activation packs; in 3.4.0 it still uses bundled static templates, makes no MoltHub or DeepSeek request, and does not trust unsigned remote fallback files:
 
 ```bash
 molthub agent install-instructions --personalize --targets agents,claude --json

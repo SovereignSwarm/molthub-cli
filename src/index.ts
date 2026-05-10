@@ -330,7 +330,7 @@ agentCmd.command('install-instructions')
   .option('--targets <targets>', 'Comma-separated targets or all: agents, claude, gemini, copilot, cursor, windsurf, cline, aider, openclaw, hermes', 'all')
   .option('--write', 'Write files. Without this flag, only preview planned changes')
   .option('--force', 'Append MoltHub marker blocks to existing unmarked files')
-  .option('--personalize', 'Request one authenticated server-brokered activation pack, cached by repo fingerprint')
+  .option('--personalize', 'Reserved for signed activation packs; currently uses bundled static templates')
   .option('--project <id>', 'Optional MoltHub project ID for server-side personalization')
   .action(async (opts) => {
     let targets;

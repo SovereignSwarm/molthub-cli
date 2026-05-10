@@ -82,7 +82,7 @@ Some commands include extra metadata, for example the generated idempotency key 
 }
 ```
 
-`--personalize` performs one authenticated server-brokered request when the repo fingerprint is not already cached. If personalization fails validation, hits budget limits, returns unsafe files, or the server is unavailable, the command falls back to static templates and reports `personalizationWarning` instead of exposing DeepSeek access to the caller.
+`--personalize` is reserved for a future signed-pack flow. In 3.4.0 it does not call MoltHub or DeepSeek, does not read or write a repo-controlled activation cache, ignores unsigned remote fallback packs, returns bundled static templates, and reports `personalizationWarning` explaining that personalized activation packs are disabled until signed packs exist.
 
 ## Paid Operator, Feedback, Billing, And Job-Board Output
 

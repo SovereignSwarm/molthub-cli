@@ -288,6 +288,7 @@ agentCmd.command('bootstrap')
         "molthub auth whoami --json",
         "molthub project inspect --id <project-id> --json",
         "molthub project plan --id <project-id> --json",
+        "molthub mission list --id <project-id> --json",
         "molthub project operator dashboard --id <project-id> --json",
         "molthub project operator status --id <project-id> --json",
         "molthub project operator runs --id <project-id> --json",

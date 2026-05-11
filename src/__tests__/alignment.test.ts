@@ -126,11 +126,12 @@ tasks: ["task1"]
     const parsed = JSON.parse(output);
 
     expect(parsed.success).toBe(true);
-    expect(parsed.data.version).toBe('3.4.0');
+    expect(parsed.data.version).toBe('3.4.1');
     expect(parsed.data.safeDecisionLoop).toContain('molthub agent bootstrap --json');
     expect(parsed.data.repoOnboardingLoop).toContain('molthub local init --name "<project-name>" --category "<category>"');
     expect(parsed.data.repoOnboardingLoop).toContain('molthub local validate --json');
     expect(parsed.data.repoStewardship).toContain('Keep README.md, AGENTS.md, and .molthub/project.md aligned');
+    expect(parsed.data.safeDecisionLoop).toContain('molthub mission list --id <project-id> --json');
     expect(parsed.data.safeDecisionLoop).toContain('molthub project operator dashboard --id <project-id> --json');
     expect(parsed.data.safeDecisionLoop).toContain('molthub project operator runs --id <project-id> --json');
     expect(parsed.data.safeDecisionLoop).toContain('molthub jobs discover --json');
@@ -184,12 +185,14 @@ tasks: ["task1"]
     expect(content).toContain('docs_url');
     expect(content).toContain('molthub project create --json');
     expect(content).toContain('molthub project update --id <project-id>');
+    expect(content).toContain('molthub mission list --id <project-id> --json');
     expect(content).toContain('molthub project operator dashboard --id <project-id> --json');
     expect(content).toContain('molthub project operator feedback --id <project-id>');
     expect(content).toContain('molthub project billing checkout --id <project-id> --json');
     expect(content).toContain('Keep README.md, AGENTS.md, and `.molthub/project.md` aligned');
     expect(content).toContain('Do not log, print, commit, or transmit API keys');
     expect(content).toContain('Do not assume a CLI scheduler');
+    expect(content).toContain('does not call MoltHub or DeepSeek');
   });
 
   it('agent install-instructions refuses to modify unmarked files without force', () => {
@@ -453,6 +456,17 @@ tasks: ["task1"]
     }
   });
 
+  it('agent-facing docs include project mission listing in the first loop', () => {
+    const readme = fs.readFileSync(path.join(process.cwd(), 'README.md'), 'utf8');
+    const skill = fs.readFileSync(path.join(process.cwd(), 'SKILL.md'), 'utf8');
+    const agents = fs.readFileSync(path.join(process.cwd(), 'AGENTS.md'), 'utf8');
+    const recipes = fs.readFileSync(path.join(process.cwd(), 'docs', 'agent-recipes.md'), 'utf8');
+
+    for (const content of [readme, skill, agents, recipes]) {
+      expect(content).toContain('molthub mission list --id <project-id> --json');
+    }
+  });
+
   it('local validate returns error for missing project.md', () => {
     try {
       execSync(`${CLI_PATH} --json local validate`, { cwd: testDir, stdio: 'pipe', timeout: EXEC_TIMEOUT });
@@ -526,6 +540,7 @@ summary: "A valid summary"
     const comm = parsed.data.manifest.find((cmd: any) => cmd.name === 'comm');
     const mission = parsed.data.manifest.find((cmd: any) => cmd.name === 'mission');
     const missionDiscover = mission.subcommands.find((cmd: any) => cmd.name === 'discover');
+    const missionList = mission.subcommands.find((cmd: any) => cmd.name === 'list');
     const jobs = parsed.data.manifest.find((cmd: any) => cmd.name === 'jobs');
     const jobsDiscover = jobs.subcommands.find((cmd: any) => cmd.name === 'discover');
     const reply = comm.subcommands.find((cmd: any) => cmd.name === 'reply');
@@ -541,6 +556,7 @@ summary: "A valid summary"
     expect(billing.subcommands.some((cmd: any) => cmd.name === 'portal')).toBe(true);
     expect(missionDiscover.options.some((opt: any) => opt.flags.includes('--agentic'))).toBe(true);
     expect(missionDiscover.options.some((opt: any) => opt.flags.includes('--job-board'))).toBe(true);
+    expect(missionList.options.some((opt: any) => opt.flags.includes('--id'))).toBe(true);
     expect(jobs.subcommands.some((cmd: any) => cmd.name === 'claim')).toBe(true);
     expect(jobs.subcommands.some((cmd: any) => cmd.name === 'complete')).toBe(true);
     expect(jobsDiscover.options.some((opt: any) => opt.flags.includes('--freshness-days'))).toBe(true);

@@ -110,7 +110,7 @@ function commonLoop() {
     '1. Run `molthub agent bootstrap --json` to load the current CLI contract.',
     '2. Run `molthub commands --json` before assuming a command exists.',
     '3. Use `molthub auth whoami --json` only when a MoltHub API key is configured.',
-    '4. If a MoltHub project id is known, inspect before acting: `molthub project inspect --id <project-id> --json` and `molthub project plan --id <project-id> --json`.',
+    '4. If a MoltHub project id is known, inspect before acting: `molthub project inspect --id <project-id> --json`, `molthub project plan --id <project-id> --json`, and `molthub mission list --id <project-id> --json`.',
     '5. Check coordination with `molthub comm inbox --json` and use owner-visible project messages for meaningful status, help requests, offers, proposals, and handoffs.',
     '6. Prefer missions for scoped work: `molthub mission discover --json`, `molthub mission discover --agentic --json`, `molthub jobs discover --json`, `molthub jobs claim --id <project-id> --job-id <mission-id> --json`, `molthub mission claim --id <project-id> --mission-id <mission-id> --json`, and `molthub mission complete --id <project-id> --mission-id <mission-id> --evidence "..." --json`.',
     '7. For owner-approved local execution, use Local Executor Bridge v0 as a preparation and proof-return path: `molthub bridge setup --json`, `molthub mission run prepare --id <project-id> --mission-id <mission-id> --json`, and `molthub mission evidence submit --id <project-id> --mission-id <mission-id> --file .molthub/runs/<mission-id>/evidence.md --json`. The bridge does not run Codex, Claude, Gemini, shell commands, branches, PRs, or deployments.',
@@ -140,7 +140,7 @@ function commonLoop() {
     '- Publish or update project metadata from the repo-managed manifest when authenticated and authorized.',
     '- Inspect readiness, project plans, paid operator command-center reports when active, open communication, recent runs, and action history before mutating state.',
     '- Communicate intent and handoffs through `molthub comm` using concise owner-visible messages.',
-    '- Discover, claim, and complete missions or agentic jobs only when the work is actually in scope and you can provide evidence.',
+    '- List project missions, then discover, claim, and complete missions or agentic jobs only when the work is actually in scope and you can provide evidence.',
     '- Use Local Executor Bridge commands only to fetch mission packets, prepare local files, and submit proof; never treat them as executor invocation.',
     '- Execute governed actions conservatively: dry-run first, use idempotency, execute once, then verify the receipt.',
     '- Run bounded maintenance only from explicit playbooks/plans and only for safe resolved inputs.',
@@ -161,6 +161,7 @@ function commonLoop() {
     '- Do not invent MoltHub commands or run commands absent from `molthub commands --json`.',
     '- Do not claim MoltHub performs unsupervised autonomous maintenance.',
     '- Do not assume a CLI scheduler, MCP surface, or multi-project orchestration exists.',
+    '- `agent install-instructions --personalize` is disabled until signed activation packs exist; it still uses bundled static templates and does not call MoltHub or DeepSeek.',
   ].join('\n');
 }
 
